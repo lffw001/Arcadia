@@ -1,0 +1,15 @@
+model dependencyManage {
+  id            Int      @id @default(autoincrement())
+  name          String // 包名（含版本表达式），如 "axios@1.7.0"
+  ecosystem     String // "npm" | "pip" | "apt"
+  installed_ver String   @default("") // 安装后回写的实际版本，空表示未安装
+  status        Int      @default(0) // 0未安装 1安装中 2已安装 3失败 4卸载中
+  last_error    String   @default("") // 最近一次失败的命令输出；安装成功时清空
+  remark        String   @default("") // 用户备注
+  create_time   DateTime @default(now())
+  update_time   DateTime @default(now()) @updatedAt
+
+  @@unique([name, ecosystem])
+  @@index([ecosystem, status])
+  @@index([ecosystem])
+}
