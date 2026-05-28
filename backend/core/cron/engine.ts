@@ -4,6 +4,16 @@ import { APP_TIMEZONE } from '../type'
 
 const id2Task: { [key: string]: TaskInstance } = {}
 
+let _cronTimezone: string = APP_TIMEZONE
+
+export function getCronTimezone(): string {
+  return _cronTimezone
+}
+
+export function setCronTimezone(tz: string): void {
+  _cronTimezone = tz
+}
+
 /**
  * 设置定时任务
  *
@@ -28,7 +38,7 @@ export function setTask(id: string, cron: string, callback: () => void) {
     },
     null, // onComplete
     true, // start
-    APP_TIMEZONE, // timeZone
+    _cronTimezone, // timeZone
   )
   cronTaskInstance.job.start() // 二次启用（保险）
 }

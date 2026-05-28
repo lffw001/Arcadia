@@ -1,14 +1,17 @@
 import type { configModel } from '../../db'
-import type { ConfigDataCli, ConfigDataRuntime, ConfigDataUser, ConfigKey } from '../type/config'
+import type { ConfigDataCli, ConfigDataRuntime, ConfigDataSystem, ConfigDataUser, ConfigKey } from '../type/config'
 import db from '../../db'
 import {
   ConfigKeyCli,
   ConfigKeyRuntime,
+  ConfigKeySystem,
   ConfigKeyUser,
   ConfigModule,
   DEFAULT_CONFIG_VALUES,
+  DEFAULT_SYSTEM_CONFIG_VALUES,
 } from '../type/config'
 import { generateCliConfigSh } from './cli'
+import { applySystemTimezone, detectAndSaveSourcesIfEmpty } from './system'
 import { isNotEmpty, randomString } from '../../utils'
 
 /**
@@ -25,6 +28,9 @@ function validateConfigFieldKey(key: string, module: ConfigModule): void {
       break
     case ConfigModule.CLI:
       validKeys = Object.values(ConfigKeyCli)
+      break
+    case ConfigModule.SYSTEM:
+      validKeys = Object.values(ConfigKeySystem)
       break
   }
   if (!validKeys.includes(key as any)) {
@@ -176,6 +182,16 @@ export async function getCliModuleConfig() {
   }
   return result
 }
+export async function getSystemModuleConfig() {
+  const map = await getModuleConfigMap(ConfigModule.SYSTEM)
+  const result = {} as ConfigDataSystem
+
+  for (const key of Object.values(ConfigKeySystem)) {
+    const value = map[key] ?? DEFAULT_SYSTEM_CONFIG_VALUES[key]
+    result[key] = value
+  }
+  return result
+}
 export async function getModuleConfig(module: ConfigModule) {
   switch (module) {
     case ConfigModule.RUNTIME:
@@ -184,6 +200,8 @@ export async function getModuleConfig(module: ConfigModule) {
       return await getUserModuleConfig()
     case ConfigModule.CLI:
       return await getCliModuleConfig()
+    case ConfigModule.SYSTEM:
+      return await getSystemModuleConfig()
   }
 }
 export async function getFullConfig() {
@@ -191,6 +209,7 @@ export async function getFullConfig() {
     [ConfigModule.RUNTIME]: await getRuntimeModuleConfig(),
     [ConfigModule.USER]: await getUserModuleConfig(),
     [ConfigModule.CLI]: await getCliModuleConfig(),
+    [ConfigModule.SYSTEM]: await getSystemModuleConfig(),
   }
 }
 
@@ -285,6 +304,18 @@ async function initCliConfig() {
 }
 
 /**
+ * 初始化系统全局配置
+ */
+async function initSystemConfig() {
+  const config = await getSystemModuleConfig()
+  if (config.SYSTEM_TIMEZONE) {
+    applySystemTimezone(config.SYSTEM_TIMEZONE)
+  }
+  // 检测当前系统软件源
+  detectAndSaveSourcesIfEmpty().catch(() => {})
+}
+
+/**
  * 初始化应用配置
  *
  * @description 清理无效的 module 和 key，初始化所有必需配置，返回完整配置对象
@@ -298,6 +329,8 @@ export async function initConfig() {
   await initRuntimeConfig()
   // 初始化 CLI 配置
   await initCliConfig()
+  // 初始化系统全局配置
+  await initSystemConfig()
   // 重新查询并返回完整配置对象
   // logger.log('初始化应用配置完成')
   return await getFullConfig()
