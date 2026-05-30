@@ -3,23 +3,19 @@ import express from 'express'
 import { API_STATUS_CODE } from '../utils/httpUtil'
 import type { dependencyManageWhereInput } from '../db'
 import db from '../db'
-import { validatePageFixedParams, validateRequestParams } from '../utils'
+import { validateRequestParams } from '../utils'
 import { DepStatus, ECOSYSTEMS, enqueueInstall, enqueueUninstall, PROTECTED, syncDeps } from '../core/dep'
 
 const api: Express = express()
-
-const ORDER_BY_FIELDS = ['id', 'name', 'ecosystem', 'status', 'create_time', 'update_time']
 
 /**
  * 获取依赖列表（分页）
  */
 api.get('/', async (request, response) => {
   try {
-    validatePageFixedParams(request, ORDER_BY_FIELDS)
     const search = request.query.search as string | undefined
     const ecosystem = request.query.ecosystem as string | undefined
     const status = request.query.status !== undefined ? Number.parseInt(request.query.status as string) : undefined
-
     const where: dependencyManageWhereInput = {}
     const and: dependencyManageWhereInput[] = []
     if (ecosystem)
@@ -36,12 +32,10 @@ api.get('/', async (request, response) => {
     }
     if (and.length > 0)
       where.AND = and
-
     const orderByField = request.query.orderBy as string | undefined
     let desc = true
     if (request.query.order === '0')
       desc = false
-
     const result = await db.dependencyManage.$page({
       where,
       orderBy: orderByField ? { [orderByField]: desc ? 'desc' : 'asc' } : { id: 'desc' },
@@ -132,19 +126,16 @@ api.post('/operate', async (request, response) => {
       ] as const,
     })
     const { action, ids } = params.body as { action: 'install' | 'uninstall' | 'sync', ids?: number[] }
-
     if (action === 'sync') {
       const result = await syncDeps()
       response.send(API_STATUS_CODE.okData(result))
       return
     }
-
     if (!ids || ids.length === 0)
       throw new Error('ids 不能为空')
     const items = await db.dependencyManage.findMany({ where: { id: { in: ids } } })
     if (items.length === 0)
       throw new Error('未找到指定依赖')
-
     if (action === 'install') {
       const toInstall = items.filter(
         v => v.status === DepStatus.NOT_INSTALLED || v.status === DepStatus.FAILED,
