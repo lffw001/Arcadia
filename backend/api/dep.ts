@@ -64,13 +64,13 @@ api.post('/', async (request, response) => {
     const { name, ecosystem, remark } = params.body as { name: string, ecosystem: string, remark?: string }
     const cleanName = name.trim()
     if (!cleanName)
-      throw new Error('name 不能为空')
+      throw new Error('名称不能为空')
     const baseName = getBaseName(ecosystem, cleanName)
     if (PROTECTED[ecosystem]?.has(baseName))
-      throw new Error(`${ecosystem}/${baseName} 为受保护项，不允许添加`)
+      throw new Error(`${baseName} 为平台保留依赖，禁止添加！`)
     const exists = await db.dependencyManage.findFirst({ where: { name: cleanName, ecosystem } })
     if (exists)
-      throw new Error(`${ecosystem}/${cleanName} 已存在`)
+      throw new Error(`${cleanName} 依赖已存在`)
     const item = await db.dependencyManage.create({
       data: {
         name: cleanName,
@@ -104,7 +104,7 @@ api.delete('/', async (request, response) => {
     const items = await db.dependencyManage.findMany({ where: { id: { in: ids } } })
     for (const item of items) {
       if (item.status === DepStatus.INSTALLING || item.status === DepStatus.UNINSTALLING) {
-        throw new Error(`依赖 ${item.ecosystem}/${item.name} 正在操作中，无法删除`)
+        throw new Error(`依赖 ${item.name} 正在操作中，无法删除！`)
       }
     }
     await db.dependencyManage.deleteMany({ where: { id: { in: ids } } })
@@ -145,7 +145,7 @@ api.post('/operate', async (request, response) => {
         throw new Error('所选依赖均无需安装')
       for (const v of toInstall) {
         if (PROTECTED[v.ecosystem]?.has(getBaseName(v.ecosystem, v.name)))
-          throw new Error(`依赖 ${v.ecosystem}/${v.name} 为受保护项，不允许操作`)
+          throw new Error(`${v.name} 为平台保留依赖，禁止操作！`)
       }
       enqueueInstall(toInstall.map(v => ({ id: v.id, name: v.name, ecosystem: v.ecosystem })))
       response.send(API_STATUS_CODE.okData({ total: toInstall.length }))
@@ -157,7 +157,7 @@ api.post('/operate', async (request, response) => {
         throw new Error('所选依赖均无需卸载')
       for (const v of toUninstall) {
         if (PROTECTED[v.ecosystem]?.has(getBaseName(v.ecosystem, v.name)))
-          throw new Error(`依赖 ${v.ecosystem}/${v.name} 为受保护项，不允许操作`)
+          throw new Error(`${v.name} 为平台保留依赖，禁止操作！`)
       }
       enqueueUninstall(toUninstall.map(v => ({ id: v.id, name: v.name, ecosystem: v.ecosystem })))
       response.send(API_STATUS_CODE.okData({ total: toUninstall.length }))

@@ -13,6 +13,8 @@ export const DepStatus = {
   UNINSTALLING: 4,
 } as const
 
+const socketEventName = 'depOperateResult'
+
 export type DepStatusValue = (typeof DepStatus)[keyof typeof DepStatus]
 
 const DEP_SCRIPT = path.join(APP_DIR_PATH.SHELL, 'utils/dep.sh')
@@ -134,7 +136,7 @@ export async function initDepSync(): Promise<void> {
 
 export async function syncDeps(): Promise<{ updated: number }> {
   if (_syncLock === 'running') {
-    throw new Error('sync already in progress')
+    throw new Error('已有同步任务在运行中，请稍后再试')
   }
   return _doSync()
 }
@@ -227,7 +229,7 @@ export function enqueueInstall(deps: Array<{ id: number, name: string, ecosystem
 async function _runInstallOne(dep: { id: number, name: string, ecosystem: string }) {
   try {
     await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.INSTALLING, last_error: '' } })
-    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.INSTALLING })
+    socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.INSTALLING })
 
     const { stdout, stderr, code } = await spawnDepScript(['install', dep.ecosystem, dep.name])
     const output = [stdout, stderr].filter(Boolean).join('\n').trim()
@@ -244,21 +246,21 @@ async function _runInstallOne(dep: { id: number, name: string, ecosystem: string
         where: { id: dep.id },
         data: { status: DepStatus.INSTALLED, installed_ver: ver, last_error: '' },
       })
-      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.INSTALLED, installed_ver: ver })
+      socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.INSTALLED, installed_ver: ver })
     }
     else {
       await db.dependencyManage.update({
         where: { id: dep.id },
         data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
       })
-      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
+      socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
     }
   }
   catch (e: any) {
     logger.error(`[dep] install ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
     try {
       await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
-      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED })
+      socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED })
     }
     catch { /* ignore db error in recovery */ }
   }
@@ -273,7 +275,7 @@ export function enqueueUninstall(deps: Array<{ id: number, name: string, ecosyst
 async function _runUninstallOne(dep: { id: number, name: string, ecosystem: string }) {
   try {
     await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.UNINSTALLING, last_error: '' } })
-    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.UNINSTALLING })
+    socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.UNINSTALLING })
 
     const base = getBaseName(dep.ecosystem, dep.name)
     const { stdout, stderr, code } = await spawnDepScript(['uninstall', dep.ecosystem, base])
@@ -284,21 +286,21 @@ async function _runUninstallOne(dep: { id: number, name: string, ecosystem: stri
         where: { id: dep.id },
         data: { status: DepStatus.NOT_INSTALLED, installed_ver: '', last_error: '' },
       })
-      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.NOT_INSTALLED, installed_ver: '' })
+      socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.NOT_INSTALLED, installed_ver: '' })
     }
     else {
       await db.dependencyManage.update({
         where: { id: dep.id },
         data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
       })
-      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
+      socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
     }
   }
   catch (e: any) {
     logger.error(`[dep] uninstall ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
     try {
       await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
-      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED })
+      socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED })
     }
     catch { /* ignore db error in recovery */ }
   }
