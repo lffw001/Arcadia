@@ -4,7 +4,7 @@ import { API_STATUS_CODE } from '../utils/httpUtil'
 import type { dependencyManageWhereInput } from '../db'
 import db from '../db'
 import { validateRequestParams } from '../utils'
-import { DepStatus, ECOSYSTEMS, enqueueInstall, enqueueUninstall, PROTECTED, syncDeps } from '../core/dep'
+import { DepStatus, ECOSYSTEMS, enqueueInstall, enqueueUninstall, getBaseName, PROTECTED, syncDeps } from '../core/dep'
 
 const api: Express = express()
 
@@ -65,8 +65,9 @@ api.post('/', async (request, response) => {
     const cleanName = name.trim()
     if (!cleanName)
       throw new Error('name 不能为空')
-    if (PROTECTED[ecosystem]?.has(cleanName))
-      throw new Error(`${ecosystem}/${cleanName} 为受保护项，不允许添加`)
+    const baseName = getBaseName(ecosystem, cleanName)
+    if (PROTECTED[ecosystem]?.has(baseName))
+      throw new Error(`${ecosystem}/${baseName} 为受保护项，不允许添加`)
     const exists = await db.dependencyManage.findFirst({ where: { name: cleanName, ecosystem } })
     if (exists)
       throw new Error(`${ecosystem}/${cleanName} 已存在`)
@@ -143,7 +144,7 @@ api.post('/operate', async (request, response) => {
       if (toInstall.length === 0)
         throw new Error('所选依赖均无需安装')
       for (const v of toInstall) {
-        if (PROTECTED[v.ecosystem]?.has(v.name))
+        if (PROTECTED[v.ecosystem]?.has(getBaseName(v.ecosystem, v.name)))
           throw new Error(`依赖 ${v.ecosystem}/${v.name} 为受保护项，不允许操作`)
       }
       enqueueInstall(toInstall.map(v => ({ id: v.id, name: v.name, ecosystem: v.ecosystem })))
@@ -155,7 +156,7 @@ api.post('/operate', async (request, response) => {
       if (toUninstall.length === 0)
         throw new Error('所选依赖均无需卸载')
       for (const v of toUninstall) {
-        if (PROTECTED[v.ecosystem]?.has(v.name))
+        if (PROTECTED[v.ecosystem]?.has(getBaseName(v.ecosystem, v.name)))
           throw new Error(`依赖 ${v.ecosystem}/${v.name} 为受保护项，不允许操作`)
       }
       enqueueUninstall(toUninstall.map(v => ({ id: v.id, name: v.name, ecosystem: v.ecosystem })))

@@ -179,7 +179,7 @@ async function _fetchInstalledMap(ecosystem: string): Promise<Map<string, string
       }
     }
     else if (ecosystem === 'gem' || ecosystem === 'luarocks') {
-      // 这三个生态的 list_all 均输出 JSON: { "pkgname": { "version": "x.y.z" }, ... }
+      // 这两个生态的 list_all 均输出 JSON: { "pkgname": { "version": "x.y.z" }, ... }
       const data = JSON.parse(stdout) as Record<string, { version: string }>
       for (const [k, v] of Object.entries(data)) {
         map.set(k.toLowerCase(), v.version)
@@ -207,7 +207,13 @@ async function _runInstallOne(dep: { id: number, name: string, ecosystem: string
     const output = [stdout, stderr].filter(Boolean).join('\n').trim()
 
     if (code === 0) {
-      const ver = await _queryVersion(dep.ecosystem, dep.name)
+      let ver = ''
+      try {
+        ver = await _queryVersion(dep.ecosystem, dep.name)
+      }
+      catch (e: any) {
+        logger.error(`[dep] queryVersion ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
+      }
       await db.dependencyManage.update({
         where: { id: dep.id },
         data: { status: DepStatus.INSTALLED, installed_ver: ver, last_error: '' },
