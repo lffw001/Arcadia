@@ -52,6 +52,7 @@ export enum ConfigKeySystem {
   NPM_REGISTRY = 'NPM_REGISTRY',
   PIP_INDEX_URL = 'PIP_INDEX_URL',
   APT_MIRROR_URL = 'APT_MIRROR_URL',
+  GEM_REGISTRY = 'GEM_REGISTRY',
 }
 /**
  * 所有配置键类型
@@ -91,6 +92,7 @@ export interface ConfigDataSystem {
   NPM_REGISTRY: string
   PIP_INDEX_URL: string
   APT_MIRROR_URL: string
+  GEM_REGISTRY: string
 }
 export interface ConfigData {
   [ConfigModule.RUNTIME]: ConfigDataRuntime
@@ -132,6 +134,7 @@ export const DEFAULT_SYSTEM_CONFIG_VALUES: Record<ConfigKeySystem, string> = {
   [ConfigKeySystem.NPM_REGISTRY]: '',
   [ConfigKeySystem.PIP_INDEX_URL]: '',
   [ConfigKeySystem.APT_MIRROR_URL]: '',
+  [ConfigKeySystem.GEM_REGISTRY]: '',
 }
 export const DEFAULT_CONFIG_VALUES: {
   [ConfigModule.RUNTIME]: Record<ConfigKeyRuntime, string>

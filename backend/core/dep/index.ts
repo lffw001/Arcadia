@@ -17,26 +17,34 @@ export type DepStatusValue = (typeof DepStatus)[keyof typeof DepStatus]
 
 const DEP_SCRIPT = path.join(APP_DIR_PATH.SHELL, 'utils/dep.sh')
 
+export const ECOSYSTEMS = ['npm', 'pnpm', 'pip', 'apt', 'luarocks', 'gem']
+
 // 按生态解析包名基础名（去除版本表达式），用于 uninstall / version 查询
 const ECOSYSTEM_BASE_NAME: Record<string, (name: string) => string> = {
   npm: name => name.replace(/@[\^~><=\s].*/u, '').replace(/@[^@]*$/u, name.startsWith('@') ? `@${name.split('@')[1] ?? ''}` : ''),
+  pnpm: name => name.replace(/@[\^~><=\s].*/u, '').replace(/@[^@]*$/u, name.startsWith('@') ? `@${name.split('@')[1] ?? ''}` : ''),
   pip: name => name.replace(/[><=!;[\s].*/u, ''),
   apt: name => name.replace(/[=><!].*/u, '').trim(),
+  gem: name => name.replace(/:.*$/u, '').replace(/[><=!].*/u, '').trim(),
+  luarocks: name => name.replace(/[>=<! ].*/u, '').trim(),
 }
 
 // 受保护包，不允许添加、安装或卸载
 export const PROTECTED: Record<string, Set<string>> = {
   npm: new Set(),
+  pnpm: new Set(),
   pip: new Set(),
   apt: new Set(['bash', 'coreutils', 'curl', 'wget', 'ca-certificates', 'openssl']),
+  luarocks: new Set(),
+  gem: new Set(),
 }
 
 export function getBaseName(ecosystem: string, name: string): string {
   const fn = ECOSYSTEM_BASE_NAME[ecosystem]
   if (!fn)
     return name
-  // npm 作用域包（@scope/pkg）特殊处理
-  if (ecosystem === 'npm' && name.startsWith('@')) {
+  // npm / pnpm 作用域包（@scope/pkg）特殊处理
+  if ((ecosystem === 'npm' || ecosystem === 'pnpm') && name.startsWith('@')) {
     const withoutAt = name.slice(1)
     const slashIdx = withoutAt.indexOf('/')
     if (slashIdx !== -1) {
@@ -109,8 +117,7 @@ async function _doSync(): Promise<{ updated: number }> {
   _syncLock = 'running'
   let updated = 0
   try {
-    const ecosystems = ['npm', 'pip', 'apt']
-    for (const eco of ecosystems) {
+    for (const eco of ECOSYSTEMS) {
       const installedMap = await _fetchInstalledMap(eco)
       const deps = await db.dependencyManage.findMany({ where: { ecosystem: eco } })
       for (const dep of deps) {
@@ -149,6 +156,14 @@ async function _fetchInstalledMap(ecosystem: string): Promise<Map<string, string
         map.set(k.toLowerCase(), v.version)
       }
     }
+    else if (ecosystem === 'pnpm') {
+      // pnpm ls --json 输出 [{dependencies:{pkg:{version}}}] 数组格式
+      const data = JSON.parse(stdout) as Array<{ dependencies?: Record<string, { version: string }> }>
+      const deps = data[0]?.dependencies ?? {}
+      for (const [k, v] of Object.entries(deps)) {
+        map.set(k.toLowerCase(), v.version)
+      }
+    }
     else if (ecosystem === 'pip') {
       const data = JSON.parse(stdout) as Array<{ name: string, version: string }>
       for (const pkg of data) {
@@ -161,6 +176,13 @@ async function _fetchInstalledMap(ecosystem: string): Promise<Map<string, string
         if (parts.length >= 2) {
           map.set(parts[0].toLowerCase(), parts[1])
         }
+      }
+    }
+    else if (ecosystem === 'gem' || ecosystem === 'luarocks') {
+      // 这三个生态的 list_all 均输出 JSON: { "pkgname": { "version": "x.y.z" }, ... }
+      const data = JSON.parse(stdout) as Record<string, { version: string }>
+      for (const [k, v] of Object.entries(data)) {
+        map.set(k.toLowerCase(), v.version)
       }
     }
   }
@@ -177,54 +199,76 @@ export function enqueueInstall(deps: Array<{ id: number, name: string, ecosystem
 }
 
 async function _runInstallOne(dep: { id: number, name: string, ecosystem: string }) {
-  await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.INSTALLING, last_error: '' } })
-  socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.INSTALLING })
+  try {
+    await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.INSTALLING, last_error: '' } })
+    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.INSTALLING })
 
-  const { stdout, stderr, code } = await spawnDepScript(['install', dep.ecosystem, dep.name])
-  const output = [stdout, stderr].filter(Boolean).join('\n').trim()
+    const { stdout, stderr, code } = await spawnDepScript(['install', dep.ecosystem, dep.name])
+    const output = [stdout, stderr].filter(Boolean).join('\n').trim()
 
-  if (code === 0) {
-    const ver = await _queryVersion(dep.ecosystem, dep.name)
-    await db.dependencyManage.update({
-      where: { id: dep.id },
-      data: { status: DepStatus.INSTALLED, installed_ver: ver, last_error: '' },
-    })
-    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.INSTALLED, installed_ver: ver })
+    if (code === 0) {
+      const ver = await _queryVersion(dep.ecosystem, dep.name)
+      await db.dependencyManage.update({
+        where: { id: dep.id },
+        data: { status: DepStatus.INSTALLED, installed_ver: ver, last_error: '' },
+      })
+      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.INSTALLED, installed_ver: ver })
+    }
+    else {
+      await db.dependencyManage.update({
+        where: { id: dep.id },
+        data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
+      })
+      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
+    }
   }
-  else {
-    await db.dependencyManage.update({
-      where: { id: dep.id },
-      data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
-    })
-    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
+  catch (e: any) {
+    logger.error(`[dep] install ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
+    try {
+      await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
+      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED })
+    }
+    catch { /* ignore db error in recovery */ }
   }
 }
 
-export function enqueueUninstall(dep: { id: number, name: string, ecosystem: string }) {
-  _queue.add(() => _runUninstallOne(dep))
+export function enqueueUninstall(deps: Array<{ id: number, name: string, ecosystem: string }>) {
+  for (const dep of deps) {
+    _queue.add(() => _runUninstallOne(dep))
+  }
 }
 
 async function _runUninstallOne(dep: { id: number, name: string, ecosystem: string }) {
-  await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.UNINSTALLING } })
-  socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.UNINSTALLING })
+  try {
+    await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.UNINSTALLING, last_error: '' } })
+    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.UNINSTALLING })
 
-  const base = getBaseName(dep.ecosystem, dep.name)
-  const { stdout, stderr, code } = await spawnDepScript(['uninstall', dep.ecosystem, base])
-  const output = [stdout, stderr].filter(Boolean).join('\n').trim()
+    const base = getBaseName(dep.ecosystem, dep.name)
+    const { stdout, stderr, code } = await spawnDepScript(['uninstall', dep.ecosystem, base])
+    const output = [stdout, stderr].filter(Boolean).join('\n').trim()
 
-  if (code === 0) {
-    await db.dependencyManage.update({
-      where: { id: dep.id },
-      data: { status: DepStatus.NOT_INSTALLED, installed_ver: '', last_error: '' },
-    })
-    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.NOT_INSTALLED, installed_ver: '' })
+    if (code === 0) {
+      await db.dependencyManage.update({
+        where: { id: dep.id },
+        data: { status: DepStatus.NOT_INSTALLED, installed_ver: '', last_error: '' },
+      })
+      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.NOT_INSTALLED, installed_ver: '' })
+    }
+    else {
+      await db.dependencyManage.update({
+        where: { id: dep.id },
+        data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
+      })
+      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
+    }
   }
-  else {
-    await db.dependencyManage.update({
-      where: { id: dep.id },
-      data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
-    })
-    socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
+  catch (e: any) {
+    logger.error(`[dep] uninstall ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
+    try {
+      await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
+      socketCommon.emit('dep_result', { id: dep.id, status: DepStatus.FAILED })
+    }
+    catch { /* ignore db error in recovery */ }
   }
 }
 

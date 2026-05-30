@@ -16,7 +16,7 @@ const ZONEINFO_ROOT = '/usr/share/zoneinfo'
  * 调用 dep.sh get-source <ecosystem>，返回当前系统配置的软件源 URL
  * @param ecosystem npm | pip | apt
  */
-function depGetSource(ecosystem: 'npm' | 'pip' | 'apt'): string {
+function depGetSource(ecosystem: 'npm' | 'pip' | 'apt' | 'gem'): string {
   try {
     return execFileSync('bash', [DEP_SH_PATH, 'get-source', ecosystem], {
       encoding: 'utf8',
@@ -33,7 +33,7 @@ function depGetSource(ecosystem: 'npm' | 'pip' | 'apt'): string {
  * @param ecosystem npm | pip | apt
  * @param url DB 中存储的镜像源 URL，传空字符串表示重置为默认
  */
-export function depSetSource(ecosystem: 'npm' | 'pip' | 'apt', url: string): void {
+export function depSetSource(ecosystem: 'npm' | 'pnpm' | 'pip' | 'apt' | 'gem', url: string): void {
   try {
     execFileSync('bash', [DEP_SH_PATH, 'set-source', ecosystem, url], {
       encoding: 'utf8',
@@ -58,10 +58,11 @@ export async function detectAndSaveSourcesIfEmpty(): Promise<void> {
     configMap[item.key] = item.value
   }
 
-  const detections: Array<{ key: ConfigKeySystem, ecosystem: 'npm' | 'pip' | 'apt' }> = [
+  const detections: Array<{ key: ConfigKeySystem, ecosystem: 'npm' | 'pip' | 'apt' | 'gem' }> = [
     { key: ConfigKeySystem.NPM_REGISTRY, ecosystem: 'npm' },
     { key: ConfigKeySystem.PIP_INDEX_URL, ecosystem: 'pip' },
     { key: ConfigKeySystem.APT_MIRROR_URL, ecosystem: 'apt' },
+    { key: ConfigKeySystem.GEM_REGISTRY, ecosystem: 'gem' },
   ]
 
   const saves: Promise<any>[] = []

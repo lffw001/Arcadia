@@ -4,7 +4,7 @@ import { API_STATUS_CODE } from '../utils/httpUtil'
 import type { dependencyManageWhereInput } from '../db'
 import db from '../db'
 import { validatePageFixedParams, validateRequestParams } from '../utils'
-import { DepStatus, enqueueInstall, enqueueUninstall, PROTECTED, syncDeps } from '../core/dep'
+import { DepStatus, ECOSYSTEMS, enqueueInstall, enqueueUninstall, PROTECTED, syncDeps } from '../core/dep'
 
 const api: Express = express()
 
@@ -16,8 +16,6 @@ const ORDER_BY_FIELDS = ['id', 'name', 'ecosystem', 'status', 'create_time', 'up
 api.get('/', async (request, response) => {
   try {
     validatePageFixedParams(request, ORDER_BY_FIELDS)
-    const page = request.query.page ? Number.parseInt(request.query.page as string) : 1
-    const size = request.query.size ? Number.parseInt(request.query.size as string) : 20
     const search = request.query.search as string | undefined
     const ecosystem = request.query.ecosystem as string | undefined
     const status = request.query.status !== undefined ? Number.parseInt(request.query.status as string) : undefined
@@ -39,19 +37,18 @@ api.get('/', async (request, response) => {
     if (and.length > 0)
       where.AND = and
 
-    const orderBy = request.query.orderBy as string | undefined
-    const order = (request.query.order === '0' ? 'asc' : 'desc') as 'asc' | 'desc'
+    const orderByField = request.query.orderBy as string | undefined
+    let desc = true
+    if (request.query.order === '0')
+      desc = false
 
-    const [data, total] = await Promise.all([
-      db.dependencyManage.findMany({
-        where,
-        skip: (page - 1) * size,
-        take: size,
-        orderBy: orderBy ? { [orderBy]: order } : { id: 'desc' },
-      }),
-      db.dependencyManage.count({ where }),
-    ])
-    response.send(API_STATUS_CODE.okData({ data, total, page, size }))
+    const result = await db.dependencyManage.$page({
+      where,
+      orderBy: orderByField ? { [orderByField]: desc ? 'desc' : 'asc' } : { id: 'desc' },
+      page: String(request.query.page),
+      size: String(request.query.size),
+    })
+    response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || e))
@@ -66,7 +63,7 @@ api.post('/', async (request, response) => {
     const params = validateRequestParams(request, {
       body: [
         ['name', [true, 'string']],
-        ['ecosystem', [true, ['npm', 'pip', 'apt']]],
+        ['ecosystem', [true, ECOSYSTEMS]],
         ['remark', [false, 'string']],
       ] as const,
     })
@@ -163,16 +160,14 @@ api.post('/operate', async (request, response) => {
     }
     else {
       // uninstall — 逐个入队
-      const toUninstall = items.filter(v => v.status === DepStatus.INSTALLED || v.status === DepStatus.FAILED)
+      const toUninstall = items.filter(v => (v.status === DepStatus.INSTALLED || v.status === DepStatus.FAILED) && !!v.installed_ver)
       if (toUninstall.length === 0)
         throw new Error('所选依赖均无需卸载')
       for (const v of toUninstall) {
         if (PROTECTED[v.ecosystem]?.has(v.name))
           throw new Error(`依赖 ${v.ecosystem}/${v.name} 为受保护项，不允许操作`)
       }
-      for (const v of toUninstall) {
-        enqueueUninstall({ id: v.id, name: v.name, ecosystem: v.ecosystem })
-      }
+      enqueueUninstall(toUninstall.map(v => ({ id: v.id, name: v.name, ecosystem: v.ecosystem })))
       response.send(API_STATUS_CODE.okData({ total: toUninstall.length }))
     }
   }
@@ -186,11 +181,13 @@ api.post('/operate', async (request, response) => {
  */
 api.get('/error', async (request, response) => {
   try {
-    const idRaw = request.query.id
-    if (!idRaw || typeof idRaw !== 'string' || !/^\d+$/.test(idRaw)) {
+    validateRequestParams(request, {
+      query: [['id', [true, 'string']]] as const,
+    })
+    const idStr = request.query.id as string
+    if (!/^\d+$/.test(idStr))
       throw new Error('参数 id 无效')
-    }
-    const id = Number.parseInt(idRaw)
+    const id = Number.parseInt(idStr)
     const item = await db.dependencyManage.findUnique({ where: { id } })
     if (!item)
       throw new Error('依赖不存在')

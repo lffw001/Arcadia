@@ -13,18 +13,21 @@ const SYSTEM_PARAM_TO_KEY: Record<string, ConfigKeySystem> = {
   npmRegistry: ConfigKeySystem.NPM_REGISTRY,
   pipIndexUrl: ConfigKeySystem.PIP_INDEX_URL,
   aptMirrorUrl: ConfigKeySystem.APT_MIRROR_URL,
+  gemRegistry: ConfigKeySystem.GEM_REGISTRY,
 }
 const SYSTEM_KEY_TO_PARAM: Record<ConfigKeySystem, string> = {
   [ConfigKeySystem.SYSTEM_TIMEZONE]: 'timezone',
   [ConfigKeySystem.NPM_REGISTRY]: 'npmRegistry',
   [ConfigKeySystem.PIP_INDEX_URL]: 'pipIndexUrl',
   [ConfigKeySystem.APT_MIRROR_URL]: 'aptMirrorUrl',
+  [ConfigKeySystem.GEM_REGISTRY]: 'gemRegistry',
 }
-const SYSTEM_PARAM_ECOSYSTEM: Record<string, 'npm' | 'pip' | 'apt' | null> = {
+const SYSTEM_PARAM_ECOSYSTEM: Record<string, 'npm' | 'pnpm' | 'pip' | 'apt' | 'gem' | null> = {
   timezone: null,
   npmRegistry: 'npm',
   pipIndexUrl: 'pip',
   aptMirrorUrl: 'apt',
+  gemRegistry: 'gem',
 }
 
 export const API: Express = express()
@@ -112,6 +115,7 @@ API.post('/system', async (request: Request, response: Response) => {
         ['npmRegistry', [false, 'string', true]],
         ['pipIndexUrl', [false, 'string', true]],
         ['aptMirrorUrl', [false, 'string', true]],
+        ['gemRegistry', [false, 'string', true]],
       ] as const,
     })
     const body = request.body as Record<string, string>
