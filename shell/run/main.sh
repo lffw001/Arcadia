@@ -219,199 +219,200 @@ function command_run() {
             --tsx | --use-tsx)
                 RUN_OPTION_USE_TSX="true"
                 ;;
-            esac
-
-            if [[ "${RUN_OPTION_DAEMON}" == "true" ]]; then
-                ## 守护进程任务专用命令选项
-                case "$1" in
-                --name)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定进程名称！"
-                    fi
-                    RUN_OPTION_DAEMON_NAME="$2"
-                    shift
-                    ;;
-                --max-restarts)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定最大重启次数！"
-                    fi
-                    echo "$2" | grep -Eq "^[0-9]+$"
-                    if [ $? -ne 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
-                    fi
-                    RUN_OPTION_DAEMON_MAX_RESTARTS="$2"
-                    shift
-                    ;;
-                --restart-delay)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定重启延迟毫秒数！"
-                    fi
-                    echo "$2" | grep -Eq "^[0-9]+$"
-                    if [ $? -ne 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
-                    fi
-                    RUN_OPTION_DAEMON_RESTART_DELAY="$2"
-                    shift
-                    ;;
-                --log-file)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定日志文件路径！"
-                    fi
-                    RUN_OPTION_DAEMON_LOG_FILE="$2"
-                    shift
-                    ;;
-                --restart-cron)
-                    if [[ -z "$2" ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定 Cron 表达式！"
-                    fi
-                    RUN_OPTION_DAEMON_RESTART_CRON="$2"
-                    shift
-                    ;;
-                --no-autorestart)
-                    RUN_OPTION_DAEMON_NO_AUTORESTART="true"
-                    ;;
-                --max-memory-restart)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定最大内存限制（例如 200M）！"
-                    fi
-                    RUN_OPTION_DAEMON_MAX_MEMORY_RESTART="$2"
-                    shift
-                    ;;
-                --stop-exit-codes)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定不触发重启的退出码！"
-                    fi
-                    echo "$2" | grep -Eq "^[0-9]+$"
-                    if [ $? -ne 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
-                    fi
-                    RUN_OPTION_DAEMON_STOP_EXIT_CODES="$2"
-                    shift
-                    ;;
-                --exp-backoff-restart-delay)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定指数退避起始延迟毫秒数！"
-                    fi
-                    echo "$2" | grep -Eq "^[0-9]+$"
-                    if [ $? -ne 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
-                    fi
-                    RUN_OPTION_DAEMON_EXP_BACKOFF_RESTART_DELAY="$2"
-                    shift
-                    ;;
-                *)
-                    output_error "命令选项 ${BLUE}$1${PLAIN} 错误，字段名称不存在！"
-                    ;;
-                esac
-            else
-                case "$1" in
-                -l | --loop)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定循环次数！"
-                    fi
-                    echo "$2" | grep -Eq "^[0-9]+$"
-                    if [ $? -ne 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是正整数！"
-                    fi
-                    RUN_OPTION_LOOP="true"
-                    RUN_OPTION_LOOP_TIMES="$2"
-                    shift
-                    ;;
-                -w | --wait)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定等待时间！"
-                    fi
-                    if echo "$2" | grep -Eq "[abcefgijklnopqrtuvwxyzA-Z,/\!@#$%^&*|\-_=\+]|\(|\)|\[|\]|\{|\}" || echo "$2" | grep -Eqv "[0-9]+([smhd]|(\.[0-9]+))$"; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 语法有误！"
-                    fi
-                    RUN_OPTION_WAIT="true"
-                    RUN_OPTION_WAIT_TIMES="$2"
-                    shift
-                    ;;
-                -D | --delay)
-                    RUN_OPTION_DELAY="true"
-                    ;;
-                -T | --timeout)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定超时命令选项！"
-                    fi
-                    RUN_OPTION_TIMEOUT="true"
-                    RUN_OPTION_TIMEOUT_OPTIONS="$2"
-                    shift
-                    ;;
-                -N | --no-log)
-                    RUN_OPTION_NO_LOG="true"
-                    ;;
-                -p | --proxy)
-                    echo "${run_target}" | grep -Eq "https?://.*github"
-                    if [ $? -ne 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，该命令选项仅适用于执行位于 GitHub 仓库的代码文件，请确认后重新输入！"
-                    fi
-                    RUN_OPTION_DOWNLOAD_PROXY="true"
-                    ;;
-                -b | --background)
-                    RUN_OPTION_BACKGROUND="true"
-                    ;;
-                -c | --concurrent)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        RUN_OPTION_CONCURRENT="true"
-                        RUN_OPTION_CONCURRENT_TASKS="1"
-                    elif ! echo "$2" | grep -Eq "^[0-9]+$" || [[ "$2" -lt 1 ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，指定的任务数量有误！"
-                    else
-                        RUN_OPTION_CONCURRENT="true"
-                        RUN_OPTION_CONCURRENT_TASKS="$2"
+            *)
+                if [[ "${RUN_OPTION_DAEMON}" == "true" ]]; then
+                    ## 守护进程任务专用命令选项
+                    case "$1" in
+                    --name)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定进程名称！"
+                        fi
+                        RUN_OPTION_DAEMON_NAME="$2"
                         shift
-                    fi
-                    ;;
-                -t | --thread)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定并发线程数！"
-                    fi
-                    echo "$2" | grep -Eq "^[0-9]+$"
-                    if [ $? -ne 0 ] || [[ "$2" -lt 1 ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是有效的正整数！"
-                    fi
-                    RUN_OPTION_THREAD="true"
-                    RUN_OPTION_THREAD_NUM="$2"
-                    shift
-                    ;;
-                -R | --recombine-env-group)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]] || [[ -z "$3" ]] || [[ "$3" == -* ]] || [[ -z "$4" ]] || [[ "$4" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后分别指定变量名称、分隔符、重组表达式！"
-                    fi
-                    echo "$4" | grep -Eq "[a-zA-Z\.;:\<\>/\!#$^&*|\-_=\+]|\(|\)|\[|\]|\{|\}"
-                    if [ $? -eq 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，重组表达式 ${BLUE}$4${PLAIN} 语法有误！"
-                    fi
-                    ## 判断是否已分组
-                    echo "$4" | grep -Eq "@"
-                    if [ $? -ne 0 ]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请定义分组，否则请使用变量重组命令选项！"
-                    fi
-                    RUN_OPTION_RECOMBINE_ENV_GROUP="true"
-                    RUN_OPTION_RECOMBINE_ENV_NAME="$2"
-                    RUN_OPTION_RECOMBINE_ENV_SEPARATOR="$3"
-                    RUN_OPTION_RECOMBINE_ENV_ARG="$4"
-                    shift
-                    shift
-                    shift
-                    ;;
-                -S | --split-env)
-                    if [[ -z "$2" ]] || [[ "$2" == -* ]] || [[ -z "$3" ]] || [[ "$3" == -* ]]; then
-                        output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后分别指定变量名称、分隔符！"
-                    fi
-                    RUN_OPTION_SPLIT_ENV="true"
-                    RUN_OPTION_SPLIT_ENV_NAME="$2"
-                    RUN_OPTION_SPLIT_ENV_SEPARATOR="$3"
-                    shift
-                    shift
-                    ;;
-                *)
-                    output_error "命令选项 ${BLUE}$1${PLAIN} 错误，字段名称不存在！"
-                    ;;
-                esac
-            fi
+                        ;;
+                    --max-restarts)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定最大重启次数！"
+                        fi
+                        echo "$2" | grep -Eq "^[0-9]+$"
+                        if [ $? -ne 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
+                        fi
+                        RUN_OPTION_DAEMON_MAX_RESTARTS="$2"
+                        shift
+                        ;;
+                    --restart-delay)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定重启延迟毫秒数！"
+                        fi
+                        echo "$2" | grep -Eq "^[0-9]+$"
+                        if [ $? -ne 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
+                        fi
+                        RUN_OPTION_DAEMON_RESTART_DELAY="$2"
+                        shift
+                        ;;
+                    --log-file)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定日志文件路径！"
+                        fi
+                        RUN_OPTION_DAEMON_LOG_FILE="$2"
+                        shift
+                        ;;
+                    --restart-cron)
+                        if [[ -z "$2" ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定 Cron 表达式！"
+                        fi
+                        RUN_OPTION_DAEMON_RESTART_CRON="$2"
+                        shift
+                        ;;
+                    --no-autorestart)
+                        RUN_OPTION_DAEMON_NO_AUTORESTART="true"
+                        ;;
+                    --max-memory-restart)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定最大内存限制（例如 200M）！"
+                        fi
+                        RUN_OPTION_DAEMON_MAX_MEMORY_RESTART="$2"
+                        shift
+                        ;;
+                    --stop-exit-codes)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定不触发重启的退出码！"
+                        fi
+                        echo "$2" | grep -Eq "^[0-9]+$"
+                        if [ $? -ne 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
+                        fi
+                        RUN_OPTION_DAEMON_STOP_EXIT_CODES="$2"
+                        shift
+                        ;;
+                    --exp-backoff-restart-delay)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定指数退避起始延迟毫秒数！"
+                        fi
+                        echo "$2" | grep -Eq "^[0-9]+$"
+                        if [ $? -ne 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是非负整数！"
+                        fi
+                        RUN_OPTION_DAEMON_EXP_BACKOFF_RESTART_DELAY="$2"
+                        shift
+                        ;;
+                    *)
+                        output_error "命令选项 ${BLUE}$1${PLAIN} 错误，选项不存在！"
+                        ;;
+                    esac
+                else
+                    case "$1" in
+                    -l | --loop)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定循环次数！"
+                        fi
+                        echo "$2" | grep -Eq "^[0-9]+$"
+                        if [ $? -ne 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是正整数！"
+                        fi
+                        RUN_OPTION_LOOP="true"
+                        RUN_OPTION_LOOP_TIMES="$2"
+                        shift
+                        ;;
+                    -w | --wait)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定等待时间！"
+                        fi
+                        if echo "$2" | grep -Eq "[abcefgijklnopqrtuvwxyzA-Z,/\!@#$%^&*|\-_=\+]|\(|\)|\[|\]|\{|\}" || echo "$2" | grep -Eqv "[0-9]+([smhd]|(\.[0-9]+))$"; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 语法有误！"
+                        fi
+                        RUN_OPTION_WAIT="true"
+                        RUN_OPTION_WAIT_TIMES="$2"
+                        shift
+                        ;;
+                    -D | --delay)
+                        RUN_OPTION_DELAY="true"
+                        ;;
+                    -T | --timeout)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定超时命令选项！"
+                        fi
+                        RUN_OPTION_TIMEOUT="true"
+                        RUN_OPTION_TIMEOUT_OPTIONS="$2"
+                        shift
+                        ;;
+                    -N | --no-log)
+                        RUN_OPTION_NO_LOG="true"
+                        ;;
+                    -p | --proxy)
+                        echo "${run_target}" | grep -Eq "https?://.*github"
+                        if [ $? -ne 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，该命令选项仅适用于执行位于 GitHub 仓库的代码文件，请确认后重新输入！"
+                        fi
+                        RUN_OPTION_DOWNLOAD_PROXY="true"
+                        ;;
+                    -b | --background)
+                        RUN_OPTION_BACKGROUND="true"
+                        ;;
+                    -c | --concurrent)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            RUN_OPTION_CONCURRENT="true"
+                            RUN_OPTION_CONCURRENT_TASKS="1"
+                        elif ! echo "$2" | grep -Eq "^[0-9]+$" || [[ "$2" -lt 1 ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，指定的任务数量有误！"
+                        else
+                            RUN_OPTION_CONCURRENT="true"
+                            RUN_OPTION_CONCURRENT_TASKS="$2"
+                            shift
+                        fi
+                        ;;
+                    -t | --thread)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后指定并发线程数！"
+                        fi
+                        echo "$2" | grep -Eq "^[0-9]+$"
+                        if [ $? -ne 0 ] || [[ "$2" -lt 1 ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，选项值 ${BLUE}$2${PLAIN} 不是有效的正整数！"
+                        fi
+                        RUN_OPTION_THREAD="true"
+                        RUN_OPTION_THREAD_NUM="$2"
+                        shift
+                        ;;
+                    -R | --recombine-env-group)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]] || [[ -z "$3" ]] || [[ "$3" == -* ]] || [[ -z "$4" ]] || [[ "$4" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后分别指定变量名称、分隔符、重组表达式！"
+                        fi
+                        echo "$4" | grep -Eq "[a-zA-Z\.;:\<\>/\!#$^&*|\-_=\+]|\(|\)|\[|\]|\{|\}"
+                        if [ $? -eq 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，重组表达式 ${BLUE}$4${PLAIN} 语法有误！"
+                        fi
+                        ## 判断是否已分组
+                        echo "$4" | grep -Eq "@"
+                        if [ $? -ne 0 ]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请定义分组，否则请使用变量重组命令选项！"
+                        fi
+                        RUN_OPTION_RECOMBINE_ENV_GROUP="true"
+                        RUN_OPTION_RECOMBINE_ENV_NAME="$2"
+                        RUN_OPTION_RECOMBINE_ENV_SEPARATOR="$3"
+                        RUN_OPTION_RECOMBINE_ENV_ARG="$4"
+                        shift
+                        shift
+                        shift
+                        ;;
+                    -S | --split-env)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]] || [[ -z "$3" ]] || [[ "$3" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 无效，请在该命令选项后分别指定变量名称、分隔符！"
+                        fi
+                        RUN_OPTION_SPLIT_ENV="true"
+                        RUN_OPTION_SPLIT_ENV_NAME="$2"
+                        RUN_OPTION_SPLIT_ENV_SEPARATOR="$3"
+                        shift
+                        shift
+                        ;;
+                    *)
+                        output_error "命令选项 ${BLUE}$1${PLAIN} 错误，选项不存在！"
+                        ;;
+                    esac
+                fi
+                ;;
+            esac
             shift
         done
 
