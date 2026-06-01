@@ -40,8 +40,8 @@ api.get('/', async (req, res) => {
 
   const captcha = generateCaptcha({
     type: 'alpha',
-    difficulty: 3, // 5 位字母数字混合
-    globalNoise: 2, // 低噪声干扰线
+    difficulty: 3,
+    globalNoise: 3,
     width,
     height,
   })
