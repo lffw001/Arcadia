@@ -3,7 +3,7 @@ model serverLog {
   id      Int      @id @default(autoincrement())
   time    DateTime @default(now())
   content String
-  type    String   // trace, debug, info, warn, error, fatal
+  type    String
 
   @@index([time])
   @@index([type])
@@ -15,7 +15,7 @@ model loginLog {
   time    DateTime @default(now())
   address String   @default("")
   ip      String   @default("")
-  result  Int      // 1=成功 0=失败
+  result  Int
 
   @@index([time])
   @@index([result])

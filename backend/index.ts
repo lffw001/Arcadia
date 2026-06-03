@@ -10,6 +10,7 @@ import { initDashboardMonitor } from './core/dashboard'
 import { initLog } from './core/log'
 import { initTerminalServer } from './server/terminal'
 import { initDaemonLogServer } from './server/daemonLog'
+import { initDepSync } from './core/dep'
 
 async function startServer() {
   // 初始化操作日志持久化
@@ -32,6 +33,9 @@ async function startServer() {
 
   // 初始化守护任务
   await initDaemonTask()
+
+  // 初始化依赖同步
+  initDepSync()
 
   // 创建 API 认证中间件
   const apiAuthentication = createApiAuthentication()

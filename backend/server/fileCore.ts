@@ -5,7 +5,7 @@ import { logger } from '../utils/logger'
 import nodePath from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
-import archiver from 'archiver'
+import { ZipArchive } from 'archiver'
 import { execFile, execSync } from 'node:child_process'
 import {
   APP_DIR_PATH,
@@ -40,7 +40,7 @@ const openApiProtectedPaths = [APP_FILE_PATH.ENV]
 // 默认过滤的文件路径
 const defaultFilterPaths = [APP_FILE_PATH.DB]
 // 全局过滤正则
-const excludeRegExp = /(user\.session)|(\.cache$)|(\.check$)|(\.git$)|(\.tmp$)|(__pycache__$)|(node_modules)|(Cargo\.lock$)|(go\.sum$)|(\.gem$)|(\.bundle\/)|(\.cargo\/)|(__MACOSX\/)|(\.rbc$)|(\.so$)|(\.luac$)|(\.o$)|(\.a$)|(\.dll$)|(\.exe$)|(\.out$)|(\.pyc$)|(\.class$)|(\.elc$)|(\.beam$)|(\.hi$)|(\.dSYM\/)|(\.ipynb_checkpoints\/)|(\.rustup\/)|(\.cargo-cache\/)|(\.luarocks\/)|(\.rbenv\/)|(\.rvm\/)|(\.cabal\/)|(\.stack-work\/)|(\.perl\/)/
+const excludeRegExp = /(user\.session)|(bot\.session)|(\.cache$)|(\.check$)|(\.git$)|(\.tmp$)|(__pycache__$)|(node_modules)|(Cargo\.lock$)|(go\.sum$)|(\.gem$)|(\.bundle\/)|(\.cargo\/)|(__MACOSX\/)|(\.rbc$)|(\.luac$)|(\.o$)|(\.a$)|(\.dll$)|(\.exe$)|(\.out$)|(\.pyc$)|(\.class$)|(\.elc$)|(\.beam$)|(\.hi$)|(\.dSYM\/)|(\.ipynb_checkpoints\/)|(\.rustup\/)|(\.cargo-cache\/)|(\.luarocks\/)|(\.rbenv\/)|(\.rvm\/)|(\.cabal\/)|(\.stack-work\/)|(\.perl\/)/
 
 interface FileList {
   title: string // 目录名
@@ -615,26 +615,41 @@ export function fileDownload(fileOrFolderPath: string, response: Response) {
   const file = fs.statSync(fileOrFolderPath)
   const fileName = nodePath.basename(fileOrFolderPath)
   if (file.isDirectory()) {
-    const archive = archiver('zip', {})
-    archive.on('error', (err: any) => {
-      response.send(API_STATUS_CODE.fail(err.message))
+    const archive = new ZipArchive({})
+    archive.on('error', (err) => {
+      logger.error(`压缩归档出错: ${err?.message ?? err}`)
+      if (!response.headersSent) {
+        response.send(API_STATUS_CODE.fail(err.message))
+      }
+      else {
+        response.end()
+      }
     })
-    archive.on('end', () => {
-      logger.info('Archive wrote %d bytes', archive.pointer())
-    })
+    // logger.info(`开始生成压缩包：${fileName}.zip`)
     response.attachment(`${fileName}.zip`)
     archive.pipe(response)
-    archive.directory(fileOrFolderPath, fileName)
-    archive.finalize().then()
+    archive.directory(fileOrFolderPath, fileName, entry => excludeRegExp.test(entry.name) ? false : entry)
+    archive.finalize().catch((err: Error) => {
+      logger.error(`压缩归档完成失败: ${err?.message ?? err}`)
+      if (!response.headersSent) {
+        response.send(API_STATUS_CODE.fail(err.message))
+      }
+      else {
+        response.end()
+      }
+    })
   }
   else {
-    response.writeHead(200, {
-      'Content-Type': 'application/octet-stream', // 告诉浏览器这是一个二进制文件
-      'Content-Disposition': `attachment; filename=${encodeURIComponent(fileName)}`, // 告诉浏览器这是一个需要下载的文件
-    })
+    response.attachment(fileName)
     fs.createReadStream(fileOrFolderPath)
       .on('error', (err) => {
-        response.send(API_STATUS_CODE.fail(err.message))
+        logger.error(`文件读取出错: ${err?.message ?? err}`)
+        if (!response.headersSent) {
+          response.send(API_STATUS_CODE.fail(err.message))
+        }
+        else {
+          response.end()
+        }
       })
       .pipe(response)
   }

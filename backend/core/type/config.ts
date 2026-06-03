@@ -5,6 +5,7 @@ export enum ConfigModule {
   RUNTIME = 'runtime', // 运行时配置
   USER = 'user', // 单用户认证
   CLI = 'cli', // CLI 配置
+  SYSTEM = 'system', // 系统全局配置
 }
 
 /**
@@ -43,11 +44,20 @@ export enum ConfigKeyCli {
   DEFAULT_TS_RUNTIME = 'DEFAULT_TS_RUNTIME',
   ENABLE_PYTHON_UV = 'ENABLE_PYTHON_UV',
 }
-
+/**
+ * 系统配置项枚举
+ */
+export enum ConfigKeySystem {
+  SYSTEM_TIMEZONE = 'SYSTEM_TIMEZONE',
+  NPM_REGISTRY = 'NPM_REGISTRY',
+  PIP_INDEX_URL = 'PIP_INDEX_URL',
+  APT_MIRROR_URL = 'APT_MIRROR_URL',
+  GEM_REGISTRY = 'GEM_REGISTRY',
+}
 /**
  * 所有配置键类型
  */
-export type ConfigKey = ConfigKeyUser | ConfigKeyRuntime | ConfigKeyCli
+export type ConfigKey = ConfigKeyUser | ConfigKeyRuntime | ConfigKeyCli | ConfigKeySystem
 
 /**
  * 配置数据
@@ -77,10 +87,18 @@ export interface ConfigDataCli {
   DEFAULT_TS_RUNTIME: string
   ENABLE_PYTHON_UV: string
 }
+export interface ConfigDataSystem {
+  SYSTEM_TIMEZONE: string
+  NPM_REGISTRY: string
+  PIP_INDEX_URL: string
+  APT_MIRROR_URL: string
+  GEM_REGISTRY: string
+}
 export interface ConfigData {
   [ConfigModule.RUNTIME]: ConfigDataRuntime
   [ConfigModule.USER]: ConfigDataUser
   [ConfigModule.CLI]: ConfigDataCli
+  [ConfigModule.SYSTEM]: ConfigDataSystem
 }
 
 /**
@@ -111,12 +129,21 @@ export const DEFAULT_CLI_CONFIG_VALUES: Record<ConfigKeyCli, string> = {
   [ConfigKeyCli.DEFAULT_TS_RUNTIME]: 'tsx',
   [ConfigKeyCli.ENABLE_PYTHON_UV]: '',
 }
+export const DEFAULT_SYSTEM_CONFIG_VALUES: Record<ConfigKeySystem, string> = {
+  [ConfigKeySystem.SYSTEM_TIMEZONE]: 'Asia/Shanghai',
+  [ConfigKeySystem.NPM_REGISTRY]: '',
+  [ConfigKeySystem.PIP_INDEX_URL]: '',
+  [ConfigKeySystem.APT_MIRROR_URL]: '',
+  [ConfigKeySystem.GEM_REGISTRY]: '',
+}
 export const DEFAULT_CONFIG_VALUES: {
   [ConfigModule.RUNTIME]: Record<ConfigKeyRuntime, string>
   [ConfigModule.USER]: Record<ConfigKeyUser, string>
   [ConfigModule.CLI]: Record<ConfigKeyCli, string>
+  [ConfigModule.SYSTEM]: Record<ConfigKeySystem, string>
 } = {
   [ConfigModule.USER]: DEFAULT_USER_CONFIG_VALUES,
   [ConfigModule.RUNTIME]: DEFAULT_RUNTIME_CONFIG_VALUES,
   [ConfigModule.CLI]: DEFAULT_CLI_CONFIG_VALUES,
+  [ConfigModule.SYSTEM]: DEFAULT_SYSTEM_CONFIG_VALUES,
 }
