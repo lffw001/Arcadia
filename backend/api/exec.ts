@@ -13,7 +13,7 @@ import {
 } from '../server/fileCore'
 import { APP_ROOT_DIR } from '../core/type'
 import { CLI_CMD } from '../core/type/cli'
-import { makeNoopRunCallbacks, makeSocketRunCallbacks, runCodeFile, runningExecTasks, runShellCmd } from '../core/runner'
+import { buildRunCodeFileCmd, makeNoopRunCallbacks, makeSocketRunCallbacks, runCodeFile, runningExecTasks, runShellCmd } from '../core/runner'
 import type { RunEnv, RunOption } from '../core/runner'
 import { createSession } from 'better-sse'
 
@@ -221,6 +221,31 @@ api.post('/file', (request, response) => {
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e?.message || '执行失败'))
+  }
+})
+
+/**
+ * 获取运行代码文件命令（不执行，仅返回命令）
+ */
+api.post('/file/command', (request, response) => {
+  try {
+    const params = validateRequestParams(request, {
+      body: [
+        ['path', [true, 'string']],
+        ['options', [false, 'object']],
+        ['envs', [false, 'object']],
+      ] as const,
+    })
+    const { path } = params.body
+    checkPathAccess(path)
+    const options = parseOptions(request.body.options)
+    const envs = parseEnvs(request.body.envs)
+    const [baseCmd, args] = buildRunCodeFileCmd(path, options, envs)
+    const command = `bash -c '${baseCmd}' -- ${args.join(' ')}`
+    response.send(API_STATUS_CODE.okData(command))
+  }
+  catch (e: any) {
+    response.send(API_STATUS_CODE.fail(e?.message || '获取命令失败'))
   }
 })
 

@@ -52,6 +52,22 @@ export function buildEnvCmdStr(envs: RunEnv[]): string {
 }
 
 /**
+ * 构建运行代码文件的 bash 命令模板和参数数组
+ *
+ * @returns [bashCmdTemplate, args] — bash -c 模板和参数数组
+ */
+export function buildRunCodeFileCmd(
+  filePath: string,
+  options: RunOption[] = [],
+  envs: RunEnv[] = [],
+): [string, string[]] {
+  const optionsArgs = buildOptionsArgs(options)
+  const envCmdStr = buildEnvCmdStr(envs)
+  const baseCmd = `cd ${APP_ROOT_DIR} ; ${envCmdStr ? `${envCmdStr} >/dev/null 2>&1 ; ` : ''}${CLI_CMD.RUN} "$1" "\${@:2}"`
+  return [baseCmd, [filePath, ...optionsArgs]]
+}
+
+/**
  * 执行 Shell 命令
  *
  * @param cmd 要执行的 shell 命令（原始命令，无需额外处理）
@@ -106,11 +122,9 @@ export function runCodeFile(
   preRunId?: string,
 ): string {
   const runId = preRunId ?? randomString(16)
-  const optionsArgs = buildOptionsArgs(options)
-  const envCmdStr = buildEnvCmdStr(envs)
-  const baseCmd = `cd ${APP_ROOT_DIR} ; ${envCmdStr ? `${envCmdStr} >/dev/null 2>&1 ; ` : ''}${CLI_CMD.RUN} "$1" "\${@:2}"`
+  const [baseCmd, args] = buildRunCodeFileCmd(filePath, options, envs)
   let done = false
-  const child = execFile('bash', ['-c', baseCmd, '--', filePath, ...optionsArgs], { encoding: 'utf-8' })
+  const child = execFile('bash', ['-c', baseCmd, '--', ...args], { encoding: 'utf-8' })
   runningExecTasks[runId] = { startedAt: new Date() }
 
   child.stdout?.on('data', (data: string) => {
