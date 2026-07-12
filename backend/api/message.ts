@@ -1,11 +1,11 @@
-import type { Express } from 'express'
+import type { Express, Request } from 'express'
 import express from 'express'
 import { API_STATUS_CODE } from '../utils/httpUtil'
-import type { messageWhereInput } from '../db'
+import type { messageModel, messageWhereInput } from '../db'
 import db from '../db'
+import type { MessageType } from '../core/type/message'
 import { cleanProperties, validatePageFixedParams, validateRequestParams } from '../utils'
 import { cleanReadMessages, getUnreadCount, pushUserMessage } from '../core/message/index'
-import { logger } from '../utils/logger'
 
 const api: Express = express()
 const apiOpen: Express = express()
@@ -16,7 +16,7 @@ type MessageScope = 'all' | 'user'
 /**
  * 消息列表查询
  */
-async function handleMessageList(request: any, scope: MessageScope) {
+async function handleMessageList(request: Request, scope: MessageScope) {
   validatePageFixedParams(request, ['create_time'])
 
   const where: messageWhereInput = {}
@@ -77,7 +77,7 @@ async function handleMessageDetail(id: number, scope: MessageScope) {
  * 标记已读（支持批量和全部）
  */
 async function handleMarkRead(ids: number[] | null, scope: MessageScope, status: number) {
-  const where: any = { status: 0 }
+  const where: messageWhereInput = { status: 0 }
   if (scope === 'user')
     where.category = 'user'
   if (ids)
@@ -89,7 +89,7 @@ async function handleMarkRead(ids: number[] | null, scope: MessageScope, status:
  * 删除消息
  */
 async function handleDelete(ids: number[], scope: MessageScope) {
-  const where: any = { id: { in: ids } }
+  const where: messageWhereInput = { id: { in: ids } }
   if (scope === 'user')
     where.category = 'user'
   await db.message.deleteMany({ where })
@@ -235,9 +235,8 @@ apiOpen.post('/v1/create', async (request, response) => {
         ['type', [false, ['info', 'warn', 'error', 'success']]],
       ] as const,
     })
-    const data = cleanProperties(request.body, ['title', 'content', 'type'])
-    await pushUserMessage(data as any)
-    logger.info('[OpenAPI · Message]', '推送消息', JSON.stringify({ title: data.title }))
+    const data: Omit<messageModel, 'type'> & { type: MessageType } = cleanProperties(request.body, ['title', 'content', 'type'])
+    await pushUserMessage(data)
     response.send(API_STATUS_CODE.okData({ count: 1 }))
   }
   catch (e: any) {
@@ -257,7 +256,6 @@ apiOpen.get('/v1/list', async (request, response) => {
       ],
     })
     const result = await handleMessageList(request, 'user')
-    logger.info('[OpenAPI · Message]', '分页查询消息', JSON.stringify({ page: request.query.page, size: request.query.size }))
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
@@ -271,7 +269,6 @@ apiOpen.get('/v1/list', async (request, response) => {
 apiOpen.get('/v1/unreadCount', async (_request, response) => {
   try {
     const total = await getUnreadCount('user')
-    logger.info('[OpenAPI · Message]', '查询未读消息计数', JSON.stringify({ total }))
     response.send(API_STATUS_CODE.okData({ total }))
   }
   catch (e: any) {
@@ -294,7 +291,6 @@ apiOpen.get('/v1/detail', async (request, response) => {
       throw new Error('参数 id 无效（参数值类型错误）')
     }
     const message = await handleMessageDetail(Number.parseInt(id), 'user')
-    logger.info('[OpenAPI · Message]', '查询消息详情', JSON.stringify({ id }))
     response.send(API_STATUS_CODE.okData(message))
   }
   catch (e: any) {
@@ -316,7 +312,6 @@ apiOpen.post('/v1/readStatus', async (request, response) => {
     const { id, status } = params.body
     const ids: number[] = Array.isArray(id) ? id : [id]
     await handleMarkRead(ids, 'user', status)
-    logger.info('[OpenAPI · Message]', '批量标记消息已读', JSON.stringify({ ids, status }))
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
@@ -336,7 +331,6 @@ apiOpen.post('/v1/readAll', async (request, response) => {
     })
     const status = request.body.status ?? 1
     await handleMarkRead(null, 'user', status)
-    logger.info('[OpenAPI · Message]', '全部标记消息已读', JSON.stringify({ status }))
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
@@ -345,7 +339,7 @@ apiOpen.post('/v1/readAll', async (request, response) => {
 })
 
 /**
- * 批量删除消息（OpenAPI）
+ * 删除消息（OpenAPI）
  */
 apiOpen.post('/v1/delete', async (request, response) => {
   try {
@@ -357,7 +351,6 @@ apiOpen.post('/v1/delete', async (request, response) => {
     const { id } = params.body
     const ids: number[] = Array.isArray(id) ? id : [id]
     await handleDelete(ids, 'user')
-    logger.info('[OpenAPI · Message]', '批量删除消息', JSON.stringify({ ids }))
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
@@ -377,15 +370,13 @@ apiInner.post('/push', async (request, response) => {
         ['type', [false, ['info', 'warn', 'error', 'success']]],
       ] as const,
     })
-    const data = cleanProperties(request.body, ['title', 'content', 'type'])
-    await pushUserMessage(data as any) // sendMessage 内部已通过 socketCommon.emit 全量广播
+    const data: Omit<messageModel, 'type'> & { type: MessageType } = cleanProperties(request.body, ['title', 'content', 'type'])
+    await pushUserMessage(data)
     // 单用户系统，消息广播给所有在线客户端
     const count = 1
-    logger.info('[Inner API · Message]', '推送消息', JSON.stringify({ title: data.title, count }))
     response.send(API_STATUS_CODE.okData({ count }))
   }
   catch (e: any) {
-    logger.error('[Inner API · Message]', '推送消息失败', e)
     response.send(API_STATUS_CODE.fail(e.message || e))
   }
 })

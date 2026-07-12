@@ -1,21 +1,10 @@
-import type { messageModel } from '../../db'
+import type { messageModel, messageWhereInput } from '../../db'
 import { db } from '../../db'
 import { validateObject } from '../../utils'
+import type { MessageData } from '../type/message'
 // import { processMessageAlert } from '../alert'
 import { logger } from '../../utils/logger'
 import { socketCommon } from '../../server/socketCommon'
-
-interface MessageData {
-  title: string
-  content: string
-  source?: string // 来源标识，格式 "模块@资源ID"，默认 'system'
-  category?: string // 模块分类：system / cron / login / user / ...
-  type?: 'info' | 'warn' | 'error' | 'success' // 消息级别
-}
-
-interface messageInfo {
-  taskId?: number
-}
 
 // 消息去重 LRU 缓存
 interface DedupEntry {
@@ -68,6 +57,9 @@ export async function sendTextMessage(str: string) {
 /**
  * 发送消息（内部调用方法）
  */
+interface messageInfo {
+  taskId?: number
+}
 export async function sendMessage(data: MessageData, info: messageInfo = {}) {
   if (!data.title) {
     logger.error('[Message] sendMessage: title 不能为空')
@@ -77,7 +69,6 @@ export async function sendMessage(data: MessageData, info: messageInfo = {}) {
     logger.error('[Message] sendMessage: content 不能为空')
     throw new Error('content 不能为空')
   }
-
   validateObject(data, [
     ['title', [true, 'string']],
     ['content', [true, 'string']],
@@ -85,18 +76,14 @@ export async function sendMessage(data: MessageData, info: messageInfo = {}) {
     ['category', [false, 'string']],
     ['type', [false, ['info', 'error', 'warn', 'success']]],
   ])
-
   if (!data.source) {
     data.source = 'system'
   }
-
   // 内容长度校验
   validateMessageLength(data)
-
   if (info.taskId) {
     logger.debug(`发送消息任务ID:${info.taskId}, data:`, data)
   }
-
   // 构造 DB 记录
   const record: { title: string, content: string, source: string, category?: string, type?: string } = {
     title: data.title,
@@ -152,6 +139,7 @@ export async function sendMessage(data: MessageData, info: messageInfo = {}) {
   dedupCache.set(fingerprint, { fingerprint, messageId: msg.id, timestamp: now })
   dedupEvict()
 
+  // 监控告警
   // await processMessageAlert(msg)
 
   // 通过 WebSocket 推送新消息
@@ -187,7 +175,7 @@ export async function pushUserMessage(data: { title: string, content: string, ty
  * 获取未读消息数量
  */
 export async function getUnreadCount(scope: 'all' | 'user' = 'all'): Promise<number> {
-  const where: any = { status: 0 }
+  const where: messageWhereInput = { status: 0 }
   if (scope === 'user') {
     where.category = 'user'
   }
