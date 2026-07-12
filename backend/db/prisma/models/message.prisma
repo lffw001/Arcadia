@@ -12,6 +12,7 @@ model message {
 
   @@index([category])
   @@index([tags])
+  @@index([status])
 }
 
 // 监控告警匹配规则

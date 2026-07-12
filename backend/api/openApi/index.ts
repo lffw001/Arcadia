@@ -16,8 +16,11 @@ export type PermissionKey
     | 'exec:cmd' // 执行 Shell 命令（任意 Shell 指令）[危险 - 默认禁用]
     | 'exec:file' // 运行代码文件（指定路径的代码文件）[危险 - 默认禁用]
     | 'exec:status' // 查询执行状态（命令/代码文件运行状态）[危险 - 默认禁用]
+    | 'message:push' // 推送消息（向消息中心发送用户消息）
+    | 'message:query' // 查询消息（分页、未读计数、详情）
+    | 'message:manage' // 管理消息（标记已读、删除）
 
-export type PermissionGroup = 'cron' | 'env' | 'file' | 'exec'
+export type PermissionGroup = 'cron' | 'env' | 'file' | 'exec' | 'message'
 
 export interface PermissionMeta {
   group: PermissionGroup
@@ -39,6 +42,9 @@ export const PERMISSION_META: Record<PermissionKey, PermissionMeta> = {
   'exec:cmd': { group: 'exec', label: '执行 Shell 命令', desc: '允许执行 Shell 命令', dangerous: true },
   'exec:file': { group: 'exec', label: '运行代码文件', desc: '允许运行指定路径的代码文件', dangerous: true },
   'exec:status': { group: 'exec', label: '查询执行状态', desc: '允许查询命令或代码文件的当前运行状态', dangerous: true },
+  'message:push': { group: 'message', label: '推送消息', desc: '允许通过 OpenAPI 向消息中心推送用户消息', dangerous: false },
+  'message:query': { group: 'message', label: '查询消息', desc: '允许分页查询、获取未读计数和消息详情', dangerous: false },
+  'message:manage': { group: 'message', label: '管理消息', desc: '允许标记消息已读和删除消息', dangerous: false },
 }
 
 // 创建令牌时默认启用的权限（不含危险权限）
@@ -47,6 +53,8 @@ export const DEFAULT_PERMISSIONS: PermissionKey[] = [
   'env:query',
   'env:manage',
   'file:list',
+  'message:push',
+  'message:query',
 ]
 
 // 所有权限键，供遍历校验使用
@@ -80,11 +88,15 @@ const ROUTE_PERM_RULES: RoutePermRule[] = [
   { pattern: /^\/exec\/v1\/(cmd|cmd\/stream)$/, permission: 'exec:cmd' },
   { pattern: /^\/exec\/v1\/(file|file\/stream|file\/stop)$/, permission: 'exec:file' },
   { pattern: /^\/exec\/v1\/status$/, permission: 'exec:status' },
+  // Message
+  { pattern: /^\/message\/v1\/create$/, permission: 'message:push' },
+  { pattern: /^\/message\/v1\/(list|unreadCount|detail)$/, permission: 'message:query' },
+  { pattern: /^\/message\/v1\/(readStatus|readAll|delete)$/, permission: 'message:manage' },
 ]
 
 /**
  * 根据请求方法和路径解析所需权限。
- * 返回 null 表示该路径无需权限校验（如 message、alert、extra 路由）。
+ * 返回 null 表示该路径无需权限校验（如 alert、extra 路由）。
  */
 export function resolveRoutePermission(method: string, path: string): PermissionKey | null {
   const upperMethod = method.toUpperCase()

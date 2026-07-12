@@ -12,7 +12,7 @@ import { OpenAPIAuthentication, OpenAPIExtra } from '../api/open'
 import { API as ApiFile, OpenAPI as OpenApiFile } from '../api/file'
 import { API as ApiEnv, OpenAPI as OpenApiEnv } from '../api/env'
 import { API as ApiCron, InnerAPI as InnerApiCron, OpenAPI as OpenApiCron } from '../api/cron'
-import { API as ApiMessage } from '../api/message'
+import { API as ApiMessage, InnerAPI as InnerApiMessage, OpenAPI as OpenApiMessage } from '../api/message'
 import { API as ApiCaptcha } from '../api/captcha'
 import { API as ApiExec, OpenAPI as OpenApiExec } from '../api/exec'
 import { API as ApiUser, InnerAPI as InnerApiUser } from '../api/user'
@@ -118,7 +118,7 @@ export function registerApp(apiAuthentication: RequestHandler) {
   openApiRouter.use('/env', OpenApiEnv)
   openApiRouter.use('/cron', OpenApiCron)
   openApiRouter.use('/exec', OpenApiExec)
-  openApiRouter.use('/message', ApiMessage)
+  openApiRouter.use('/message', OpenApiMessage)
   openApiRouter.use('/alert', ApiAlert)
   app.use('/api/open', OpenAPIAuthentication, openApiRouter)
   const handleOpenApiSyntaxError: ErrorRequestHandler = (err, _req, res, next) => {
@@ -203,6 +203,7 @@ export function registerApp(apiAuthentication: RequestHandler) {
   innerRouter.use('/cron', InnerApiCron)
   innerRouter.use('/user', InnerApiUser)
   innerRouter.use('/log', InnerApiLog)
+  innerRouter.use('/message', InnerApiMessage)
   app.use('/api/inner', innerIpWhitelist, innerRouter)
 
   /**
