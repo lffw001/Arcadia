@@ -1,10 +1,9 @@
 import type { Express, Request } from 'express'
 import express from 'express'
 import { API_STATUS_CODE } from '../utils/httpUtil'
-import type { messageModel, messageWhereInput } from '../db'
+import type { messageWhereInput } from '../db'
 import db from '../db'
-import type { MessageType } from '../core/type/message'
-import { cleanProperties, validatePageFixedParams, validateRequestParams } from '../utils'
+import { validatePageFixedParams, validateRequestParams } from '../utils'
 import { cleanReadMessages, getUnreadCount, pushUserMessage } from '../core/message/index'
 
 const api: Express = express()
@@ -24,17 +23,19 @@ async function handleMessageList(request: Request, scope: MessageScope) {
     where.category = { equals: 'user' }
   }
 
-  // 类型过滤
-  if (request.query.category && scope === 'all') {
-    where.category = { equals: request.query.category as string }
+  // 分类过滤（支持逗号分隔多值，仅 API 生效；OpenAPI 固定 category=user）
+  if (scope === 'all' && request.query.category) {
+    const categories = (request.query.category as string).split(',').map(s => s.trim()).filter(Boolean)
+    if (categories.length === 1) {
+      where.category = { equals: categories[0] }
+    }
+    else if (categories.length > 1) {
+      where.category = { in: categories }
+    }
   }
   // 状态过滤
   if (request.query.status) {
     where.status = Number.parseInt(request.query.status as string)
-  }
-  // 消息来源过滤
-  if (request.query.source) {
-    where.source = { equals: request.query.source as string }
   }
   // 搜索过滤
   if (request.query.search) {
@@ -96,15 +97,14 @@ async function handleDelete(ids: number[], scope: MessageScope) {
 }
 
 /**
- * 获取消息列表
+ * 分页查询
  */
 api.get('/list', async (request, response) => {
   try {
     validateRequestParams(request, {
       query: [
         ['category', [false, 'string']],
-        ['status', [false, 'string']],
-        ['source', [false, 'string']],
+        ['status', [false, ['1', '0']]],
       ],
     })
     const result = await handleMessageList(request, 'all')
@@ -171,13 +171,13 @@ api.delete('/', async (request, response) => {
 })
 
 /**
- * 全部标记为已读
+ * 更新全部消息已读状态
  */
 api.put('/status/all', async (request, response) => {
   try {
     validateRequestParams(request, {
       body: [
-        ['status', [false, 'number']],
+        ['status', [false, [1, 0]]],
       ] as const,
     })
     const status = request.body.status ?? 1
@@ -190,14 +190,14 @@ api.put('/status/all', async (request, response) => {
 })
 
 /**
- * 更新消息状态
+ * 更新消息已读状态
  */
 api.put('/status', async (request, response) => {
   try {
     const params = validateRequestParams(request, {
       body: [
         ['id', [true, 'number | number[]']],
-        ['status', [true, 'number']],
+        ['status', [true, [1, 0]]],
       ] as const,
     })
     const { id, status } = params.body
@@ -211,11 +211,21 @@ api.put('/status', async (request, response) => {
 })
 
 /**
- * 清空已读消息
+ * 清空消息
  */
-api.delete('/read', async (_request, response) => {
+api.delete('/all', async (request, response) => {
   try {
-    const result = await db.message.deleteMany({ where: { status: 1 } })
+    const params = validateRequestParams(request, {
+      body: [
+        ['status', [false, [1, 0]]],
+      ] as const,
+    })
+    const { status } = params.body
+    const where: messageWhereInput = {}
+    if (status) {
+      where.status = status
+    }
+    const result = await db.message.deleteMany({ where })
     response.send(API_STATUS_CODE.okData({ count: result.count }))
   }
   catch (e: any) {
@@ -228,15 +238,15 @@ api.delete('/read', async (_request, response) => {
  */
 apiOpen.post('/v1/create', async (request, response) => {
   try {
-    validateRequestParams(request, {
+    const params = validateRequestParams(request, {
       body: [
         ['title', [true, 'string']],
         ['content', [true, 'string']],
         ['type', [false, ['info', 'warn', 'error', 'success']]],
       ] as const,
     })
-    const data: Omit<messageModel, 'type'> & { type: MessageType } = cleanProperties(request.body, ['title', 'content', 'type'])
-    await pushUserMessage(data)
+    const { title, content, type } = params.body
+    await pushUserMessage({ title, content, type })
     response.send(API_STATUS_CODE.okData({ count: 1 }))
   }
   catch (e: any) {
@@ -251,8 +261,7 @@ apiOpen.get('/v1/list', async (request, response) => {
   try {
     validateRequestParams(request, {
       query: [
-        ['status', [false, 'string']],
-        ['source', [false, 'string']],
+        ['status', [false, ['1', '0']]],
       ],
     })
     const result = await handleMessageList(request, 'user')
@@ -306,7 +315,7 @@ apiOpen.post('/v1/readStatus', async (request, response) => {
     const params = validateRequestParams(request, {
       body: [
         ['id', [true, 'number | number[]']],
-        ['status', [true, 'number']],
+        ['status', [true, [1, 0]]],
       ] as const,
     })
     const { id, status } = params.body
@@ -326,7 +335,7 @@ apiOpen.post('/v1/readAll', async (request, response) => {
   try {
     validateRequestParams(request, {
       body: [
-        ['status', [false, 'number']],
+        ['status', [false, [1, 0]]],
       ] as const,
     })
     const status = request.body.status ?? 1
@@ -363,15 +372,15 @@ apiOpen.post('/v1/delete', async (request, response) => {
  */
 apiInner.post('/push', async (request, response) => {
   try {
-    validateRequestParams(request, {
+    const params = validateRequestParams(request, {
       body: [
         ['title', [true, 'string']],
         ['content', [true, 'string']],
         ['type', [false, ['info', 'warn', 'error', 'success']]],
       ] as const,
     })
-    const data: Omit<messageModel, 'type'> & { type: MessageType } = cleanProperties(request.body, ['title', 'content', 'type'])
-    await pushUserMessage(data)
+    const { title, content, type } = params.body
+    await pushUserMessage({ title, content, type })
     // 单用户系统，消息广播给所有在线客户端
     const count = 1
     response.send(API_STATUS_CODE.okData({ count }))
