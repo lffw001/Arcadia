@@ -40,20 +40,6 @@ function validateMessageLength(data: MessageData) {
   }
 }
 
-// 消息发送
-export async function sendTextMessage(str: string) {
-  if (str.startsWith('{') && str.endsWith('}')) {
-    return await sendMessage(JSON.parse(str))
-  }
-  return await sendMessage({
-    title: str.substring(0, 20),
-    content: str,
-    source: 'system',
-    category: 'cron',
-    type: 'info',
-  })
-}
-
 /**
  * 发送消息（内部调用方法）
  */

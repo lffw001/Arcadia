@@ -292,10 +292,11 @@ apiOpen.post('/v1/create', async (request, response) => {
         ['active', [false, [1, 0]]],
         ['remark', [false, 'string']],
         ['config', [false, 'object']],
+        ['error_notify', [false, [1, 0]]],
       ] as const,
     })
     const { cron } = params.body
-    const task = cleanProperties(Object.assign({}, request.body), ['name', 'cron', 'shell', 'active', 'remark', 'config'])
+    const task = cleanProperties(Object.assign({}, request.body), ['name', 'cron', 'shell', 'active', 'remark', 'config', 'error_notify'])
     // 校验高级配置
     if (task.config) {
       let config: TaskConfig = task.config
@@ -399,6 +400,7 @@ apiOpen.post('/v1/update', async (request, response) => {
         ['active', [false, [1, 0]]],
         ['remark', [false, 'string']],
         ['config', [false, 'object']],
+        ['error_notify', [false, [1, 0]]],
       ] as const,
     })
     const { id, cron } = params.body
@@ -409,7 +411,7 @@ apiOpen.post('/v1/update', async (request, response) => {
     if (!record) {
       throw new Error('任务不存在')
     }
-    const task = cleanProperties(Object.assign({}, request.body), ['id', 'name', 'cron', 'shell', 'type', 'active', 'remark', 'config'])
+    const task = cleanProperties(Object.assign({}, request.body), ['id', 'name', 'cron', 'shell', 'type', 'active', 'remark', 'config', 'error_notify'])
     // 校验高级配置
     if (task.config) {
       let config: TaskConfig = task.config

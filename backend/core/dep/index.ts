@@ -2,7 +2,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import db from '../../db'
 import { APP_DIR_PATH } from '../type'
-import { socketCommon } from '../../server/socket'
+import { socketCommon } from '../../server/socketCommon'
 import { logger } from '../../utils/logger'
 
 export const DepStatus = {

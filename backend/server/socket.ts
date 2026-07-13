@@ -3,8 +3,10 @@ import type { Server as HttpServer } from 'node:http'
 import { Server } from 'socket.io'
 import type { JwtPayload, VerifyCallback } from 'jsonwebtoken'
 import jwt from 'jsonwebtoken'
-import { addAfterTaskRun, addBeforeTaskRun } from '../core/cron/taskRunner'
 import { getJwtSecretSync } from '../core/config'
+import type { taskRunInfo } from '../core/cron/taskRunner'
+import type { tasksModel } from '../db'
+import { socketCommon } from './socketCommon'
 
 declare module 'http' {
   interface IncomingMessage {
@@ -59,42 +61,22 @@ export function initSocketServer(server: HttpServer) {
   return io
 }
 
-/* eslint-disable no-restricted-globals */
-export const socketCommon = {
-  getSocket() {
-    return global.io
-  },
-  setSocket(io: Server) {
-    global.io = io
-  },
-  emit(name: string, data: any) {
-    const io = this.getSocket()
-    if (io) {
-      io.emit(name, data)
-    }
-  },
+export function emitTaskStarted(task: Pick<tasksModel, 'id' | 'name' | 'type'>) {
+  socketCommon.emit('task:started', {
+    taskId: task.id,
+    taskName: task.name,
+    taskType: task.type,
+    startTime: Date.now(),
+  })
 }
 
-// task相关
-;(() => {
-  addBeforeTaskRun((task) => {
-    // 推送到客户端
-    socketCommon.emit('task:started', {
-      taskId: task.id,
-      taskName: task.name,
-      taskType: task.type,
-      startTime: Date.now(),
-    })
+export function emitTaskCompleted(info: taskRunInfo) {
+  socketCommon.emit('task:completed', {
+    taskId: info.task.id,
+    taskName: info.task.name,
+    taskType: info.task.type,
+    completedTime: Date.now(),
+    duration: info.duration,
+    success: info.success,
   })
-
-  addAfterTaskRun((info) => {
-    socketCommon.emit('task:completed', {
-      taskId: info.task.id,
-      taskName: info.task.name,
-      taskType: info.task.type,
-      completedTime: Date.now(),
-      duration: info.duration,
-      success: info.success,
-    })
-  })
-})()
+}

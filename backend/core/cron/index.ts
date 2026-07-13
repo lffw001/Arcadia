@@ -1,11 +1,9 @@
 import { removeTask, setTask, validateCronExpression } from './engine'
-import type { tasksModel } from '../../db'
 import db from '../../db'
 import type { TaskInstance } from './type'
 import { logger } from '../../utils/logger'
-import { addAfterTaskRun, addBeforeTaskRun, liveLogRegistered, runCronTask, runningTasks, runningTasksInsts } from './taskRunner'
+import { liveLogRegistered, runCronTask, runningTasksInsts } from './taskRunner'
 import { makeSocketRunCallbacks } from '../runner'
-import { APP_ROOT_DIR } from '../type'
 
 export { runCronTask, runningTasks, stopCronTask } from './taskRunner'
 
@@ -204,73 +202,3 @@ export async function updateSortById(taskId: number, newOrder: number) {
   await db.$executeRaw`COMMIT;`
   return true
 }
-;(() => {
-  addBeforeTaskRun((task) => {
-    // 解析高级配置
-    if (task.config) {
-      let before_task_shell = ''
-      let after_task_shell = ''
-      let allow_concurrency = false
-      try {
-        const config = JSON.parse(task.config)
-        if (typeof config.before_task_shell === 'string') {
-          before_task_shell = config.before_task_shell
-        }
-        if (typeof config.after_task_shell === 'string') {
-          after_task_shell = config.after_task_shell
-        }
-        if (typeof config.allow_concurrency === 'boolean') {
-          allow_concurrency = config.allow_concurrency
-        }
-      }
-      catch {}
-      // 跳过正在运行的任务（运行并发时除外）
-      if (runningTasks[task.id] && !allow_concurrency) {
-        // logger.log('触发定时任务', task.shell, '（PASS，原因：正在运行）')
-        return
-      }
-      if (before_task_shell) {
-        task.shell = `${before_task_shell}" ; ${task.shell}`
-      }
-      if (after_task_shell) {
-        task.shell = `${task.shell} ; bash -c "cd ${APP_ROOT_DIR} ; ${after_task_shell}"`
-      }
-    }
-  })
-  addAfterTaskRun((info) => {
-    const task = info.task
-    let allow_concurrency = false // 是否允许并发
-    if (task.config) {
-      try {
-        const config = JSON.parse(task.config)
-        if (typeof config.allow_concurrency === 'boolean') {
-          allow_concurrency = config.allow_concurrency
-        }
-      }
-      catch {}
-    }
-    const startTime = info.startTime
-    const duration = info.duration
-    const data = { last_runtime: new Date(startTime), last_run_use: duration / 1000 }
-    // 允许并发后存在任务重叠的情况，需要具体判断
-    if (allow_concurrency) {
-      db.tasks.$getById(task.id).then((task: tasksModel) => {
-        // 如果记录的最后时间比当前时间早，则更新
-        if (task.last_runtime && task.last_runtime.getTime() <= startTime) {
-          // 从正在运行的任务中删除
-          delete runningTasks[task.id]
-          delete runningTasksInsts[task.id]
-          // 更新最后运行时间和其运行时长
-          db.tasks.update({ where: { id: task.id }, data }).catch((_e) => {})
-        }
-      }).catch((_e) => {})
-    }
-    else {
-      // 从正在运行的任务中删除
-      delete runningTasks[task.id]
-      delete runningTasksInsts[task.id]
-      // 更新最后运行时间和其运行时长
-      db.tasks.update({ where: { id: task.id }, data }).catch((_e) => {})
-    }
-  })
-})()

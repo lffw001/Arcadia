@@ -1,6 +1,6 @@
 import { exec, execFile } from 'node:child_process'
 import { getNeatContent } from '../../server/fileCore'
-import { socketCommon } from '../../server/socket'
+import { socketCommon } from '../../server/socketCommon'
 import { randomString } from '../../utils'
 import { API_STATUS_CODE } from '../../utils/httpUtil'
 import { APP_ROOT_DIR } from '../type'

@@ -4,42 +4,21 @@ import type { ChildProcess } from 'node:child_process'
 import { logger } from '../../utils/logger'
 import { execShell } from '../../utils/cmdUtil'
 import { APP_ROOT_DIR } from '../type'
+import { emitTaskCompleted, emitTaskStarted } from '../../server/socket'
+import { notifyTaskFailure } from '../message/task'
 
 export interface taskRunInfo {
   startTime: number
   endTime: number
   duration: number
   success: boolean
-  task: tasksModel
+  task: Pick<tasksModel, 'id' | 'name' | 'type' | 'error_notify'>
 }
 
 export const runningTasks: { [key: string]: tasksModel } = {} // 正在运行的任务信息
 export const runningTasksInsts: { [key: string]: ChildProcess | undefined } = {} // 正在运行的任务实例（child_process）
 
-const beforeTaskRun: Array<{ order: number, fn: (task: tasksModel) => any }> = []
-const afterTaskRun: Array<{ order: number, fn: (info: taskRunInfo) => any }> = []
-
 export const liveLogRegistered = new Set<number>() // 已注册实时日志监听器的任务集合（key: taskId）
-
-/**
- * 添加任务执行前的回调函数
- * @param fn
- * @param order 优先级, 越小越先执行
- */
-export function addBeforeTaskRun(fn: (task: tasksModel) => any, order: number = 100) {
-  beforeTaskRun.push({ fn, order })
-  beforeTaskRun.sort((a, b) => a.order - b.order)
-}
-
-/**
- * 添加任务执行后的回调函数
- * @param fn
- * @param order 优先级, 越小越先执行
- */
-export function addAfterTaskRun(fn: (info: taskRunInfo) => any, order: number = 100) {
-  afterTaskRun.push({ fn, order })
-  afterTaskRun.sort((a, b) => a.order - b.order)
-}
 
 /**
  * 定时任务回调内容
@@ -130,46 +109,60 @@ export function stopCronTask(taskId: number) {
 
 /**
  * 执行定时任务的命令
- *
  */
-function runTaskModel(task: tasksModel) {
+function runTaskModel(task: Pick<tasksModel, 'id' | 'name' | 'type' | 'shell' | 'error_notify'>) {
   const startTime = Date.now()
 
-  beforeTaskRun.forEach((f) => f.fn(task))
+  emitTaskStarted(task)
+
   return execShell(task.shell, {
     callback: (error, stdout, _stderr) => {
-      // 任务回调
       if (error) {
         logger.warn(`定时任务 "${task.shell}" 执行异常`, error.toString().substring(stdout.length - 1000))
       }
-      const callback = (task as any).onShellCallback
-      let callbacks: any[] = (task as any).onShellCallbacks
-      if (callback || callbacks) {
-        if (!callbacks) {
-          callbacks = []
-        }
-        if (callback) {
-          callbacks.push(callback)
-        }
-        callbacks.forEach((fn) => {
-          if (typeof fn === 'function') {
-            fn(task, error, stdout)
-          }
-        })
-      }
     },
     onExit: (code) => {
-      // logger.log(`定时任务 ${taskId} 运行完毕`)
       const endTime = new Date().getTime()
       const duration = endTime - startTime
       const success = code === 0 || code === null
-      afterTaskRun.forEach((f) => f.fn({
-        task,
-        startTime,
-        endTime,
-        duration,
-        success,
-      }))
+      const info: taskRunInfo = { task, startTime, endTime, duration, success }
+
+      cleanupRunningTaskState(task, startTime, duration)
+      emitTaskCompleted(info)
+      if (!success) {
+        notifyTaskFailure(info).catch((e) =>
+          logger.error('发送任务失败通知异常', e))
+      }
     },
   })
+}
+
+/**
+ * 清理任务运行状态并更新最后运行时间
+ * 从 cron/index.ts::registerCronCallbacks 迁移而来
+ */
+function cleanupRunningTaskState(task: Pick<tasksModel, 'id'>, startTime: number, duration: number) {
+  const data = {
+    last_runtime: new Date(startTime),
+    last_run_use: duration / 1000,
+  }
+
+  // 存在并发重叠（另一个实例仍在运行），需要比较时间戳
+  if (runningTasks[task.id]) {
+    db.tasks.$getById(task.id).then((t: tasksModel) => {
+      // 如果记录的最后时间比当前时间早，则更新
+      if (t.last_runtime && t.last_runtime.getTime() <= startTime) {
+        delete runningTasks[t.id]
+        delete runningTasksInsts[t.id]
+        db.tasks.update({ where: { id: t.id }, data }).catch((_e) => {})
+      }
+    }).catch((_e) => {})
+  }
+  else {
+    // 从正在运行的任务中删除
+    delete runningTasks[task.id]
+    delete runningTasksInsts[task.id]
+    // 更新最后运行时间和其运行时长
+    db.tasks.update({ where: { id: task.id }, data }).catch((_e) => {})
+  }
 }
