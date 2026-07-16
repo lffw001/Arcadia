@@ -179,6 +179,5 @@ export async function cleanReadMessages(days: number) {
       create_time: { lt: cutoffDate },
     },
   })
-  logger.info(`[Message] 清理已读消息: 删除 ${result.count} 条 (超过 ${days} 天)`)
   return { count: result.count }
 }

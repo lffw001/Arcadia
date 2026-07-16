@@ -53,6 +53,11 @@ export enum ConfigKeySystem {
   PIP_INDEX_URL = 'PIP_INDEX_URL',
   APT_MIRROR_URL = 'APT_MIRROR_URL',
   GEM_REGISTRY = 'GEM_REGISTRY',
+  LOG_RETENTION_DAYS = 'LOG_RETENTION_DAYS',
+  MESSAGE_RETENTION_DAYS = 'MESSAGE_RETENTION_DAYS',
+  TASK_HISTORY_RETENTION_DAYS = 'TASK_HISTORY_RETENTION_DAYS',
+  CLEANUP_CRON_EXPRESSION = 'CLEANUP_CRON_EXPRESSION',
+  CLEANUP_CRON_ENABLED = 'CLEANUP_CRON_ENABLED',
 }
 /**
  * 所有配置键类型
@@ -93,6 +98,11 @@ export interface ConfigDataSystem {
   PIP_INDEX_URL: string
   APT_MIRROR_URL: string
   GEM_REGISTRY: string
+  LOG_RETENTION_DAYS: string
+  MESSAGE_RETENTION_DAYS: string
+  TASK_HISTORY_RETENTION_DAYS: string
+  CLEANUP_CRON_EXPRESSION: string
+  CLEANUP_CRON_ENABLED: string
 }
 export interface ConfigData {
   [ConfigModule.RUNTIME]: ConfigDataRuntime
@@ -135,6 +145,11 @@ export const DEFAULT_SYSTEM_CONFIG_VALUES: Record<ConfigKeySystem, string> = {
   [ConfigKeySystem.PIP_INDEX_URL]: '',
   [ConfigKeySystem.APT_MIRROR_URL]: '',
   [ConfigKeySystem.GEM_REGISTRY]: '',
+  [ConfigKeySystem.LOG_RETENTION_DAYS]: '7',
+  [ConfigKeySystem.MESSAGE_RETENTION_DAYS]: '7',
+  [ConfigKeySystem.TASK_HISTORY_RETENTION_DAYS]: '7',
+  [ConfigKeySystem.CLEANUP_CRON_EXPRESSION]: '',
+  [ConfigKeySystem.CLEANUP_CRON_ENABLED]: 'true',
 }
 export const DEFAULT_CONFIG_VALUES: {
   [ConfigModule.RUNTIME]: Record<ConfigKeyRuntime, string>

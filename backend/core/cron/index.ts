@@ -4,6 +4,7 @@ import type { TaskInstance } from './type'
 import { logger } from '../../utils/logger'
 import { getLatestRunningInstance, liveLogRegistered, runCronTask } from './taskRunner'
 import { makeSocketRunCallbacks } from '../runner'
+import { registerCleanupCron } from './cleanup'
 
 export { getAllRunningInstances, isTaskRunning, runCronTask, stopCronTask } from './taskRunner'
 
@@ -89,6 +90,10 @@ export async function initCronJob() {
     }
     await applyCron(task.id)
   }
+
+  // 初始化定时清理任务（配置驱动，独立于 tasks/taskCore）
+  await registerCleanupCron()
+
   // logger.log('任务总数', taskCoreCurd.list().length)
   logger.log('定时任务初始化完毕')
 }

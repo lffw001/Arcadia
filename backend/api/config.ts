@@ -6,6 +6,7 @@ import { getCliModuleConfig, getSystemModuleConfig, updateConfigValue } from '..
 import { ConfigKeyCli, ConfigKeySystem, ConfigModule } from '../core/type/config'
 import { generateCliConfigSh } from '../core/config/cli'
 import { applySystemTimezone, depSetSource } from '../core/config/system'
+import { registerCleanupCron } from '../core/cron/cleanup'
 
 // 接口参数名（camelCase）内部配置键映射
 const SYSTEM_PARAM_TO_KEY: Record<string, ConfigKeySystem> = {
@@ -14,6 +15,11 @@ const SYSTEM_PARAM_TO_KEY: Record<string, ConfigKeySystem> = {
   pipIndexUrl: ConfigKeySystem.PIP_INDEX_URL,
   aptMirrorUrl: ConfigKeySystem.APT_MIRROR_URL,
   gemRegistry: ConfigKeySystem.GEM_REGISTRY,
+  logRetentionDays: ConfigKeySystem.LOG_RETENTION_DAYS,
+  messageRetentionDays: ConfigKeySystem.MESSAGE_RETENTION_DAYS,
+  taskHistoryRetentionDays: ConfigKeySystem.TASK_HISTORY_RETENTION_DAYS,
+  cleanupCronExpression: ConfigKeySystem.CLEANUP_CRON_EXPRESSION,
+  cleanupCronEnabled: ConfigKeySystem.CLEANUP_CRON_ENABLED,
 }
 const SYSTEM_KEY_TO_PARAM: Record<ConfigKeySystem, string> = {
   [ConfigKeySystem.SYSTEM_TIMEZONE]: 'timezone',
@@ -21,6 +27,11 @@ const SYSTEM_KEY_TO_PARAM: Record<ConfigKeySystem, string> = {
   [ConfigKeySystem.PIP_INDEX_URL]: 'pipIndexUrl',
   [ConfigKeySystem.APT_MIRROR_URL]: 'aptMirrorUrl',
   [ConfigKeySystem.GEM_REGISTRY]: 'gemRegistry',
+  [ConfigKeySystem.LOG_RETENTION_DAYS]: 'logRetentionDays',
+  [ConfigKeySystem.MESSAGE_RETENTION_DAYS]: 'messageRetentionDays',
+  [ConfigKeySystem.TASK_HISTORY_RETENTION_DAYS]: 'taskHistoryRetentionDays',
+  [ConfigKeySystem.CLEANUP_CRON_EXPRESSION]: 'cleanupCronExpression',
+  [ConfigKeySystem.CLEANUP_CRON_ENABLED]: 'cleanupCronEnabled',
 }
 const SYSTEM_PARAM_ECOSYSTEM: Record<string, 'npm' | 'pnpm' | 'pip' | 'apt' | 'gem' | null> = {
   timezone: null,
@@ -28,6 +39,11 @@ const SYSTEM_PARAM_ECOSYSTEM: Record<string, 'npm' | 'pnpm' | 'pip' | 'apt' | 'g
   pipIndexUrl: 'pip',
   aptMirrorUrl: 'apt',
   gemRegistry: 'gem',
+  logRetentionDays: null,
+  messageRetentionDays: null,
+  taskHistoryRetentionDays: null,
+  cleanupCronExpression: null,
+  cleanupCronEnabled: null,
 }
 
 export const API: Express = express()
@@ -116,6 +132,11 @@ API.post('/system', async (request: Request, response: Response) => {
         ['pipIndexUrl', [false, 'string', true]],
         ['aptMirrorUrl', [false, 'string', true]],
         ['gemRegistry', [false, 'string', true]],
+        ['logRetentionDays', [false, 'string', true]],
+        ['messageRetentionDays', [false, 'string', true]],
+        ['taskHistoryRetentionDays', [false, 'string', true]],
+        ['cleanupCronExpression', [false, 'string', true]],
+        ['cleanupCronEnabled', [false, 'string', true]],
       ] as const,
     })
     const body = request.body as Record<string, string>
@@ -141,6 +162,10 @@ API.post('/system', async (request: Request, response: Response) => {
       const ecosystem = SYSTEM_PARAM_ECOSYSTEM[param]
       if (ecosystem && value) {
         depSetSource(ecosystem, value)
+      }
+      // 定时清理 cron 配置变化时重新注册
+      if (param === 'cleanupCronExpression') {
+        registerCleanupCron(value).catch(() => {})
       }
     }
     response.send(API_STATUS_CODE.ok())

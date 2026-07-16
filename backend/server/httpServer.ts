@@ -18,7 +18,7 @@ import { API as ApiExec, OpenAPI as OpenApiExec } from '../api/exec'
 import { API as ApiUser, InnerAPI as InnerApiUser } from '../api/user'
 import { API as ApiOpenApi, systemApi } from '../api/system'
 import { API as ApiAlert } from '../api/alert'
-import { API as ApiLog, InnerAPI as InnerApiLog } from '../api/log'
+import { API as ApiLog } from '../api/log'
 import { API as ApiConfig } from '../api/config'
 import { API as ApiDaemon } from '../api/daemon'
 import { API as ApiDep } from '../api/dep'
@@ -202,7 +202,6 @@ export function registerApp(apiAuthentication: RequestHandler) {
   const innerRouter: Router = express.Router()
   innerRouter.use('/cron', InnerApiCron)
   innerRouter.use('/user', InnerApiUser)
-  innerRouter.use('/log', InnerApiLog)
   innerRouter.use('/message', InnerApiMessage)
   app.use('/api/inner', innerIpWhitelist, innerRouter)
 

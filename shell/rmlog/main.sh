@@ -36,30 +36,6 @@ function command_rmlog_main() {
             fi
         done
     }
-    ## 清理后端系统日志
-    function rm_sys_log() {
-        local data='{"days": '"${RmDays}"'}'
-        local res=$(curl -s -X POST -H "Content-Type: application/json" -d "${data}" "http://127.0.0.1:5678/api/inner/log/clean")
-        local result="$(echo "${res}" | jq -rc '.result')"
-        local serverLog="$(echo "${result}" | jq -r ".serverLog")"
-        local loginLog="$(echo "${result}" | jq -r ".loginLog")"
-        if [[ "${loginLog}" -gt 0 ]]; then
-            echo -e "已清理 ${BLUE}${loginLog}${PLAIN} 条系统登录日志"
-        fi
-        if [[ "${serverLog}" -gt 0 ]]; then
-            echo -e "已清理 ${BLUE}${serverLog}${PLAIN} 条系统操作日志"
-        fi
-    }
-
-    ## 清理消息中心已读消息
-    function rm_message() {
-        local data='{"days": '"${RmDays}"'}'
-        local res=$(curl -s -X POST -H "Content-Type: application/json" -d "${data}" "http://127.0.0.1:5678/api/inner/message/clean")
-        local count="$(echo "${res}" | jq -rc '.data.count')"
-        if [[ "${count}" -gt 0 ]] 2>/dev/null; then
-            echo -e "已清理 ${BLUE}${count}${PLAIN} 条已读消息"
-        fi
-    }
 
     case $# in
     0)
@@ -80,8 +56,6 @@ function command_rmlog_main() {
         rm_empty_dir "$LogDir"                                   # 删除日志目录下的空文件夹
         [ -d "$ConfigDir/bak" ] && rm_empty_dir "$ConfigDir/bak" # 删除备份配置文件目录下的空文件夹
         [ -f $RootDir/core ] && rm -rf $RootDir/core             # 删除缓存
-        rm_sys_log                                               # 清理后端系统日志
-        rm_message                                               # 清理消息中心已读消息
         echo -e "\n$COMPLETE 运行结束\n"
     fi
     cd $current_dir

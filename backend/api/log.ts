@@ -3,10 +3,10 @@ import express from 'express'
 import { API_STATUS_CODE } from '../utils/httpUtil'
 import type { loginLogWhereInput, serverLogWhereInput } from '../db'
 import db from '../db'
-import { cleanLoginLogs, cleanServerLogs } from '../core/log'
+import { validateRequestParams } from '../utils'
+import { CLEANUP_TYPES, runCleanup } from '../core/cleanup'
 
 const api: Express = express()
-const apiInner: Express = express()
 
 /**
  * 操作日志分页查询
@@ -75,29 +75,30 @@ api.get('/login', async (request, response) => {
 })
 
 /**
- * 清理旧日志（内部接口）
+ * 清理日志与数据值
  */
-apiInner.post('/clean', async (request, response) => {
-  const days = Number(request.body.days)
-  if (!Number.isFinite(days) || !Number.isInteger(days) || days < 1) {
-    return response.send(API_STATUS_CODE.fail('days 必须为大于 0 的整数'))
-  }
+api.post('/cleanup', async (request, response) => {
   try {
-    const [serverResult, loginResult] = await Promise.all([
-      cleanServerLogs(days),
-      cleanLoginLogs(days),
-    ])
-    response.send(API_STATUS_CODE.okData({
-      serverLog: serverResult.count,
-      loginLog: loginResult.count,
-    }))
+    const params = validateRequestParams(request, {
+      body: [
+        ['days', [false, 'number']],
+        ['types', [false, 'string[]']],
+      ] as const,
+    })
+    const { days, types } = params.body
+    if (typeof days === 'number' && days <= 0) {
+      response.send(API_STATUS_CODE.fail('参数 days 无效（参数值类型错误）'))
+      return
+    }
+    if (types && types.some((t: any) => !CLEANUP_TYPES.includes(t))) {
+      throw new Error('参数 types 无效（参数值类型错误）')
+    }
+    const result = await runCleanup(days ?? null, types as any)
+    response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    response.send(API_STATUS_CODE.fail(e.message || '清理失败'))
   }
 })
 
-export {
-  api as API,
-  apiInner as InnerAPI,
-}
+export const API = api

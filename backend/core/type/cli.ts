@@ -10,6 +10,8 @@ export enum CLI_CMD {
   RUND = 'arcadia rund',
   /** arcadia stop <filePath> — 停止运行中的任务 */
   STOP = 'arcadia stop',
+  /** arcadia rmlog [days] — 清理代码文件运行日志 */
+  RMLOG = 'arcadia rmlog',
   /** arcadia envm edit <key> <value> — 设置环境变量 */
   ENVM_EDIT = 'arcadia envm edit',
 }

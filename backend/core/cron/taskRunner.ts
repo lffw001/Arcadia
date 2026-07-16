@@ -7,7 +7,7 @@ import { execShell } from '../../utils/cmdUtil'
 import { APP_ROOT_DIR } from '../type'
 import { emitTaskCompleted, emitTaskStarted } from '../../server/socket'
 import { notifyTaskFailure } from '../message/task'
-import { persistTaskExecution } from '../dashboard/task'
+import { persistTaskExecution } from '../dashboard'
 
 export interface taskRunInfo {
   startTime: number

@@ -4,7 +4,7 @@ import { API_STATUS_CODE } from '../utils/httpUtil'
 import type { messageWhereInput } from '../db'
 import db from '../db'
 import { validatePageFixedParams, validateRequestParams } from '../utils'
-import { cleanReadMessages, getUnreadCount, pushUserMessage } from '../core/message/index'
+import { getUnreadCount, pushUserMessage } from '../core/message/index'
 
 const api: Express = express()
 const apiOpen: Express = express()
@@ -384,23 +384,6 @@ apiInner.post('/push', async (request, response) => {
     // 单用户系统，消息广播给所有在线客户端
     const count = 1
     response.send(API_STATUS_CODE.okData({ count }))
-  }
-  catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
-  }
-})
-
-/**
- * 清理已读消息（Inner API）
- */
-apiInner.post('/clean', async (request, response) => {
-  try {
-    const days = Number(request.body.days)
-    if (!Number.isFinite(days) || !(days > 0)) {
-      return response.send(API_STATUS_CODE.fail('days 必须为大于 0 的有效数字'))
-    }
-    const result = await cleanReadMessages(days)
-    response.send(API_STATUS_CODE.okData({ count: result?.count ?? 0 }))
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || e))

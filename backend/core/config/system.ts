@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { APP_DIR_PATH } from '../type'
 import { ConfigKeySystem, ConfigModule } from '../type/config'
-import { setCronTimezone } from '../cron/engine'
+import { reapplyAllTimezone, setCronTimezone } from '../cron/engine'
 import db from '../../db'
 
 const DEP_SH_PATH = path.join(APP_DIR_PATH.SHELL, 'utils/dep.sh')
@@ -98,6 +98,7 @@ export function applySystemTimezone(tz: string): void {
     return
 
   setCronTimezone(tz)
+  reapplyAllTimezone()
   try {
     if (fs.existsSync(zoneFile)) {
       if (fs.existsSync('/etc/localtime')) {
