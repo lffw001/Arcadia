@@ -6,10 +6,11 @@ import { validateCronExpression } from '../core/cron/engine'
 import {
   applyCron,
   fixOrder,
+  getAllRunningInstances,
   getBindGroup,
+  isTaskRunning,
   registerLiveLogEvent,
   runCronTask,
-  runningTasks,
   stopCronTask,
   updateSortById,
 } from '../core/cron'
@@ -118,7 +119,7 @@ api.get('/', async (request, response) => {
         task.last_runtime = new Date(task.last_runtime)
       }
       // 当前运行状态
-      (task as any).is_running = !!runningTasks[task.id];
+      (task as any).is_running = isTaskRunning(task.id);
       // 日志路径与代码文件（临时）
       (task as any).log_path = '';
       (task as any).script_path = ''
@@ -222,7 +223,7 @@ apiOpen.get('/v1/page', async (request, response) => {
         task.last_runtime = new Date(task.last_runtime)
       }
       // 当前运行状态
-      (task as any).is_running = !!runningTasks[task.id]
+      (task as any).is_running = isTaskRunning(task.id)
     })
     // 返回数据
     response.send(API_STATUS_CODE.okData(tasks))
@@ -569,7 +570,7 @@ apiOpen.get('/v1/tagsList', async (_request, response) => {
  */
 function getRunningTasks(response: Response) {
   try {
-    const result = Object.values(runningTasks)
+    const result = getAllRunningInstances()
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {

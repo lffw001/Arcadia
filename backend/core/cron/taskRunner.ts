@@ -2,10 +2,12 @@ import type { tasksModel } from '../../db'
 import { db } from '../../db'
 import type { ChildProcess } from 'node:child_process'
 import { logger } from '../../utils/logger'
+import { randomString } from '../../utils'
 import { execShell } from '../../utils/cmdUtil'
 import { APP_ROOT_DIR } from '../type'
 import { emitTaskCompleted, emitTaskStarted } from '../../server/socket'
 import { notifyTaskFailure } from '../message/task'
+import { persistTaskExecution } from '../dashboard/task'
 
 export interface taskRunInfo {
   startTime: number
@@ -15,10 +17,95 @@ export interface taskRunInfo {
   task: Pick<tasksModel, 'id' | 'name' | 'type' | 'error_notify'>
 }
 
-export const runningTasks: { [key: string]: tasksModel } = {} // 正在运行的任务信息
-export const runningTasksInsts: { [key: string]: ChildProcess | undefined } = {} // 正在运行的任务实例（child_process）
+/**
+ * 任务高级配置（从 task.config JSON 解析）
+ */
+export interface CronTaskConfig {
+  allow_concurrency: boolean
+  before_task_shell: string
+  after_task_shell: string
+}
 
-export const liveLogRegistered = new Set<number>() // 已注册实时日志监听器的任务集合（key: taskId）
+/**
+ * 解析任务高级配置
+ */
+export function parseTaskConfig(configStr: string | null | undefined): CronTaskConfig {
+  const result: CronTaskConfig = {
+    allow_concurrency: false,
+    before_task_shell: '',
+    after_task_shell: '',
+  }
+  if (!configStr) {
+    return result
+  }
+  try {
+    const config = JSON.parse(configStr)
+    if (typeof config.allow_concurrency === 'boolean') {
+      result.allow_concurrency = config.allow_concurrency
+    }
+    if (typeof config.before_task_shell === 'string') {
+      result.before_task_shell = config.before_task_shell
+    }
+    if (typeof config.after_task_shell === 'string') {
+      result.after_task_shell = config.after_task_shell
+    }
+  }
+  catch {}
+  return result
+}
+
+/**
+ * 运行中的任务实例
+ */
+interface RunningInstance {
+  runId: string
+  task: tasksModel
+  child: ChildProcess | undefined
+  startTime: number
+}
+
+const runInstances = new Map<number, Map<string, RunningInstance>>()
+
+// 已注册实时日志监听器的任务实例集合（key: runId）
+export const liveLogRegistered = new Set<string>()
+
+/**
+ * 检查指定任务是否正在运行
+ */
+export function isTaskRunning(taskId: number): boolean {
+  const instances = runInstances.get(taskId)
+  return !!instances && instances.size > 0
+}
+
+/**
+ * 获取所有正在运行的任务实例列表
+ */
+export function getAllRunningInstances(): tasksModel[] {
+  const result: tasksModel[] = []
+  for (const instances of runInstances.values()) {
+    for (const inst of instances.values()) {
+      result.push(inst.task)
+    }
+  }
+  return result
+}
+
+/**
+ * 获取指定任务最新的运行实例（按启动时间最晚）
+ */
+export function getLatestRunningInstance(taskId: number): RunningInstance | undefined {
+  const instances = runInstances.get(taskId)
+  if (!instances || instances.size === 0) {
+    return undefined
+  }
+  let latest: RunningInstance | undefined
+  for (const inst of instances.values()) {
+    if (!latest || inst.startTime > latest.startTime) {
+      latest = inst
+    }
+  }
+  return latest
+}
 
 /**
  * 定时任务回调内容
@@ -27,52 +114,51 @@ export const liveLogRegistered = new Set<number>() // 已注册实时日志监�
  * @param {boolean} manual - 是否为手动触发，手动触发时忽略禁用状态
  */
 export async function runCronTask(taskId: number, manual: boolean = false) {
-  const task = await db.tasks.$getById(taskId)
-  // 删除不存在的定时任务
-  if (!task) {
-    await db.taskCore.$deleteById(`T_${taskId}`)
-    return
-  }
-  // logger.log('触发定时任务', task.shell)
-  // 跳过禁用的任务
-  if (!manual && task.active <= 0) {
-    // logger.log("触发定时任务", task.shell, "（PASS，原因：已被禁用）")
-    return
-  }
-  // 解析高级配置
-  let allow_concurrency = false // 默认不允许并发
-  let before_task_shell = ''
-  let after_task_shell = ''
-  if (task.config) {
-    try {
-      const config = JSON.parse(task.config)
-      if (typeof config.allow_concurrency === 'boolean') {
-        allow_concurrency = config.allow_concurrency
-      }
-      if (typeof config.before_task_shell === 'string') {
-        before_task_shell = config.before_task_shell
-      }
-      if (typeof config.after_task_shell === 'string') {
-        after_task_shell = config.after_task_shell
-      }
+  try {
+    const task = await db.tasks.$getById(taskId)
+    // 删除不存在的定时任务
+    if (!task) {
+      await db.taskCore.$deleteById(`T_${taskId}`)
+      return
     }
-    catch {}
+    // logger.log('触发定时任务', task.shell)
+    // 跳过禁用的任务
+    if (!manual && task.active <= 0) {
+      // logger.log("触发定时任务", task.shell, "（PASS，原因：已被禁用）")
+      return
+    }
+    // 解析高级配置
+    const config = parseTaskConfig(task.config)
+    if (isTaskRunning(taskId) && !config.allow_concurrency) {
+      // 跳过正在运行的任务
+      // logger.log('触发定时任务', task.shell, '（PASS，原因：正在运行）')
+      return
+    }
+    // 拼接运行前/后命令
+    if (config.before_task_shell) {
+      task.shell = `bash -c "cd ${APP_ROOT_DIR} ; ${config.before_task_shell}" ; ${task.shell}`
+    }
+    if (config.after_task_shell) {
+      task.shell = `${task.shell} ; bash -c "cd ${APP_ROOT_DIR} ; ${config.after_task_shell}"`
+    }
+
+    const runId = randomString(16)
+    const startTime = Date.now()
+    const child = runTaskModel(task, runId, config.allow_concurrency)
+
+    // 注册到多实例运行表（仅当子进程成功创建时）
+    if (child) {
+      if (!runInstances.has(taskId)) {
+        runInstances.set(taskId, new Map())
+      }
+      runInstances.get(taskId)!.set(runId, { runId, task, child, startTime })
+    }
+
+    return { runId, child }
   }
-  if (runningTasks[taskId] && !allow_concurrency) {
-    // 跳过正在运行的任务
-    // logger.log('触发定时任务', task.shell, '（PASS，原因：正在运行）')
-    return
+  catch (e) {
+    logger.error(`定时任务 ${taskId} 执行异常`, e)
   }
-  // 运行前/后命令
-  if (before_task_shell) {
-    task.shell = `bash -c "cd ${APP_ROOT_DIR} ; ${before_task_shell}" ; ${task.shell}`
-  }
-  if (after_task_shell) {
-    task.shell = `${task.shell} ; bash -c "cd ${APP_ROOT_DIR} ; ${after_task_shell}"`
-  }
-  runningTasks[taskId] = task // 将任务添加到正在运行的列表
-  runningTasksInsts[taskId] = runTaskModel(task)
-  return runningTasksInsts[taskId]
 }
 
 /**
@@ -81,36 +167,63 @@ export async function runCronTask(taskId: number, manual: boolean = false) {
  * @param {number} taskId
  */
 export function stopCronTask(taskId: number) {
-  const task = runningTasksInsts[taskId]
-  if (task) {
-    let isExited = false
-    let elapsedTime = 0
+  const latest = getLatestRunningInstance(taskId)
+  if (!latest) {
+    return
+  }
 
-    task.kill('SIGTERM')
-    task.once('exit', (_code: string, signal: string) => {
-      if (signal === 'SIGTERM' || signal === 'SIGKILL') {
-        delete runningTasksInsts[taskId]
-        isExited = true
-        // logger.log(`定时任务 ${taskId} 已被终止`);
-      }
-    })
-    const checkInterval = setInterval(() => {
-      elapsedTime += 1000
-      if (isExited || elapsedTime >= 30000) {
-        clearInterval(checkInterval) // 清除定时器（已终止或超时）
-      }
-      else if (runningTasksInsts[taskId]) {
-        task.kill('SIGKILL') // 强制终止
+  const { runId, child } = latest
+  if (!child) {
+    return
+  }
+  let isExited = false
+  let elapsedTime = 0
+
+  child.kill('SIGTERM')
+  child.once('exit', (_code: string, signal: string) => {
+    if (signal === 'SIGTERM' || signal === 'SIGKILL') {
+      removeInstance(taskId, runId)
+      isExited = true
+      // logger.log(`定时任务 ${taskId} 已被终止`);
+    }
+  })
+  const checkInterval = setInterval(() => {
+    elapsedTime += 1000
+    if (isExited) {
+      clearInterval(checkInterval)
+      return
+    }
+    if (elapsedTime >= 30000) {
+      clearInterval(checkInterval)
+      if (runInstances.get(taskId)?.has(runId)) {
+        child.kill('SIGKILL') // 强制终止
         // logger.log(`定时任务 ${taskId} 已被强制终止`);
       }
-    }, 1000) // 每秒检查一次
+    }
+  }, 1000) // 每秒检查一次
+}
+
+/**
+ * 从运行注册表中移除指定实例
+ */
+function removeInstance(taskId: number, runId: string) {
+  const instances = runInstances.get(taskId)
+  if (instances) {
+    instances.delete(runId)
+    if (instances.size === 0) {
+      runInstances.delete(taskId)
+    }
   }
 }
 
 /**
  * 执行定时任务的命令
  */
-function runTaskModel(task: Pick<tasksModel, 'id' | 'name' | 'type' | 'shell' | 'error_notify'>) {
+function runTaskModel(
+  task: tasksModel,
+  runId: string,
+  allowConcurrency: boolean,
+) {
   const startTime = Date.now()
 
   emitTaskStarted(task)
@@ -127,8 +240,15 @@ function runTaskModel(task: Pick<tasksModel, 'id' | 'name' | 'type' | 'shell' | 
       const success = code === 0 || code === null
       const info: taskRunInfo = { task, startTime, endTime, duration, success }
 
-      cleanupRunningTaskState(task, startTime, duration)
+      try {
+        cleanupRunningTaskState(task, runId, startTime, duration, allowConcurrency)
+      }
+      catch (e) {
+        logger.error(`清理任务运行状态异常 (task: ${task.name})`, e)
+      }
       emitTaskCompleted(info)
+      persistTaskExecution(task, duration, success).catch((e) =>
+        logger.error('持久化任务执行记录异常', e))
       if (!success) {
         notifyTaskFailure(info).catch((e) =>
           logger.error('发送任务失败通知异常', e))
@@ -139,30 +259,31 @@ function runTaskModel(task: Pick<tasksModel, 'id' | 'name' | 'type' | 'shell' | 
 
 /**
  * 清理任务运行状态并更新最后运行时间
- * 从 cron/index.ts::registerCronCallbacks 迁移而来
  */
-function cleanupRunningTaskState(task: Pick<tasksModel, 'id'>, startTime: number, duration: number) {
+function cleanupRunningTaskState(
+  task: tasksModel,
+  runId: string,
+  startTime: number,
+  duration: number,
+  allowConcurrency: boolean,
+) {
   const data = {
     last_runtime: new Date(startTime),
     last_run_use: duration / 1000,
   }
 
-  // 存在并发重叠（另一个实例仍在运行），需要比较时间戳
-  if (runningTasks[task.id]) {
+  // 先从内存中清除
+  removeInstance(task.id, runId)
+
+  if (allowConcurrency) {
+    // 并发场景：需要比较时间戳避免覆盖更新的运行记录
     db.tasks.$getById(task.id).then((t: tasksModel) => {
-      // 如果记录的最后时间比当前时间早，则更新
-      if (t.last_runtime && t.last_runtime.getTime() <= startTime) {
-        delete runningTasks[t.id]
-        delete runningTasksInsts[t.id]
+      if (!t.last_runtime || t.last_runtime.getTime() <= startTime) {
         db.tasks.update({ where: { id: t.id }, data }).catch((_e) => {})
       }
     }).catch((_e) => {})
   }
   else {
-    // 从正在运行的任务中删除
-    delete runningTasks[task.id]
-    delete runningTasksInsts[task.id]
-    // 更新最后运行时间和其运行时长
     db.tasks.update({ where: { id: task.id }, data }).catch((_e) => {})
   }
 }

@@ -15,6 +15,18 @@ export function setCronTimezone(tz: string): void {
 }
 
 /**
+ * 重新应用当前时区到所有已注册的定时任务
+ */
+export function reapplyAllTimezone(): void {
+  const entries = Object.entries(id2Task)
+  for (const [id, task] of entries) {
+    if (task.job && typeof task.callback === 'function') {
+      setTask(id, task.cron, task.callback)
+    }
+  }
+}
+
+/**
  * 设置定时任务
  *
  * @param {string} id - 任务ID

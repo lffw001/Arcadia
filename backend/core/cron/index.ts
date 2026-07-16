@@ -2,23 +2,26 @@ import { removeTask, setTask, validateCronExpression } from './engine'
 import db from '../../db'
 import type { TaskInstance } from './type'
 import { logger } from '../../utils/logger'
-import { liveLogRegistered, runCronTask, runningTasksInsts } from './taskRunner'
+import { getLatestRunningInstance, liveLogRegistered, runCronTask } from './taskRunner'
 import { makeSocketRunCallbacks } from '../runner'
 
-export { runCronTask, runningTasks, stopCronTask } from './taskRunner'
+export { getAllRunningInstances, isTaskRunning, runCronTask, stopCronTask } from './taskRunner'
 
 /**
  * 注册实时日志事件
  */
 export function registerLiveLogEvent(taskId: number) {
   try {
-    const child = runningTasksInsts[taskId]
+    const latest = getLatestRunningInstance(taskId)
+    if (!latest) {
+      return { running: false, runId: '' }
+    }
+    const { runId, child } = latest
     if (!child) {
       return { running: false, runId: '' }
     }
-    const runId = `tasks_${taskId}`
-    if (!liveLogRegistered.has(taskId)) {
-      liveLogRegistered.add(taskId)
+    if (!liveLogRegistered.has(runId)) {
+      liveLogRegistered.add(runId)
       const callbacks = makeSocketRunCallbacks()
       child.stdout?.on('data', (data: { toString: () => string }) => {
         callbacks.onStdout(runId, data.toString())
@@ -26,8 +29,8 @@ export function registerLiveLogEvent(taskId: number) {
       child.stderr?.on('data', (data: { toString: () => string }) => {
         callbacks.onStderr(runId, data.toString())
       })
-      child.once('exit', () => {
-        liveLogRegistered.delete(taskId)
+      child.once('close', () => {
+        liveLogRegistered.delete(runId)
         callbacks.onExit(runId)
       })
     }
@@ -95,9 +98,7 @@ export async function initCronJob() {
 function onCron(task: TaskInstance) {
   if (task.id.startsWith('T_') && task.callback === '') {
     runCronTask(Number.parseInt(task.id.substring(2)))
-      .then((_r) => {
-        // console.log("over", r)
-      })
+      .catch((e) => logger.error(`定时任务 ${task.id} 触发异常`, e))
   }
   if (typeof task.callback === 'function') {
     task.callback()
@@ -119,6 +120,9 @@ export async function applyCron(taskId: number | string | (number | string)[]) {
   }
   for (let id of ids) {
     id = Number.parseInt(id as unknown as string)
+    if (Number.isNaN(id)) {
+      continue
+    }
     const task = await db.tasks.$getById(id)
     if (task) {
       await setTaskCore(`T_${task.id}`, task.cron.trim(), '')

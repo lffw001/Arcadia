@@ -1,7 +1,6 @@
-import type { tasksModel } from '../../db'
 import db from '../../db'
 import { logger } from '../../utils/logger'
-import { runningTasks } from './taskRunner'
+import { getAllRunningInstances } from './taskRunner'
 import type { TasksFilterType } from '../type/cron'
 import { TasksTypeEnum } from '../type/cron'
 
@@ -115,7 +114,7 @@ export async function getDashboardStats(taskType: TasksFilterType = TasksTypeEnu
     logger.warn('[定时任务监控] 获取执行统计失败', e.message || e)
   }
 
-  const runningCount = Object.values(runningTasks)
+  const runningCount = getAllRunningInstances()
     .filter(task => taskType === TasksTypeEnum.ALL || task.type === taskType)
     .length
 
@@ -175,7 +174,7 @@ export async function getDashboardTrend(
  * 获取正在运行的任务列表
  */
 export function getDashboardRunning(taskType: TasksFilterType = TasksTypeEnum.ALL): RunningTaskInfo[] {
-  const tasks: tasksModel[] = Object.values(runningTasks)
+  const tasks = getAllRunningInstances()
   return tasks
     .filter(task => taskType === TasksTypeEnum.ALL || task.type === taskType)
     .map(task => ({
