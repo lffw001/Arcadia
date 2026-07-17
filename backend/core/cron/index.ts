@@ -76,7 +76,7 @@ export async function initCronJob() {
     // 设置定时
     try {
       setTask(taskCoreId, cronExpression, () => onCron(task))
-      // logger.log(`设置定时任务 ${tasksId} 成功 => ${cronExpression}`)
+      // logger.info(`设置定时任务 ${tasksId} 成功 => ${cronExpression}`)
     }
     catch (e: any) {
       logger.error(`设置定时任务 ${tasksId} 失败 => ${cronExpression} ${e.message || e}`)
@@ -94,8 +94,8 @@ export async function initCronJob() {
   // 初始化定时清理任务（配置驱动，独立于 tasks/taskCore）
   await registerCleanupCron()
 
-  // logger.log('任务总数', taskCoreCurd.list().length)
-  logger.log('定时任务初始化完毕')
+  // logger.info('任务总数', taskCoreCurd.list().length)
+  logger.info('定时任务初始化完成')
 }
 /**
  * 定时任务回调

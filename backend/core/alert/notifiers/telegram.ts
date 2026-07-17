@@ -28,7 +28,7 @@ export async function sendTelegramNotification(msg: messageModel, notification: 
     })
 
     if (response.data.ok) {
-      logger.log(`Telegram notification sent successfully: ${title}`)
+      logger.info(`Telegram notification sent successfully: ${title}`)
     }
     else {
       logger.error(`Failed to send Telegram notification: ${title}, error: ${JSON.stringify(response.data)}`)

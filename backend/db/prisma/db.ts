@@ -38,6 +38,6 @@ if (debug) {
   // eslint-disable-next-line ts/ban-ts-comment
   // @ts-expect-error
   _prisma.$on('query', (e: any) => {
-    logger.log(`SQL(${(e.duration as number).toFixed(1)}ms): ${e.query}; ${e.params}`)
+    logger.info(`SQL(${(e.duration as number).toFixed(1)}ms): ${e.query}; ${e.params}`)
   })
 }

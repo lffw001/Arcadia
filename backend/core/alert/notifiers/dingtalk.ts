@@ -36,7 +36,7 @@ export async function sendDingtalkNotification(msg: messageModel, notification: 
     })
 
     if (response.data.errcode === 0) {
-      logger.log(`DingTalk notification sent successfully: ${title}`)
+      logger.info(`DingTalk notification sent successfully: ${title}`)
     }
     else {
       logger.error(`Failed to send DingTalk notification: ${title}, error: ${response.data.errmsg}`)

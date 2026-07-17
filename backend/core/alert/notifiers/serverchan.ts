@@ -20,7 +20,7 @@ export async function sendServerchanNotification(msg: messageModel, notification
 
     const data = response.data
     if (data.errno === 0 || data.data?.errno === 0) {
-      logger.log(`ServerChan notification sent successfully: ${title}`)
+      logger.info(`ServerChan notification sent successfully: ${title}`)
     }
     else if (data.errno === 1024) {
       logger.warn(`ServerChan notification send warning: ${data.errmsg}`)

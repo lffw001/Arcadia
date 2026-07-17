@@ -20,7 +20,7 @@ export async function sendPushplusNotification(msg: messageModel, notification: 
     })
 
     if (response.data.code === 200) {
-      logger.log(`PushPlus notification sent successfully: ${title}`)
+      logger.info(`PushPlus notification sent successfully: ${title}`)
     }
     else {
       logger.error(`Failed to send PushPlus notification: ${title}, error: ${response.data.msg}`)

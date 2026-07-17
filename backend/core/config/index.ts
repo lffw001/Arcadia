@@ -331,7 +331,7 @@ export async function initConfig() {
   await initCliConfig()
   // 初始化系统全局配置
   await initSystemConfig()
-  // logger.log('初始化应用配置完成')
+  // logger.info('初始化应用配置完成')
   // 重新查询并返回完整配置对象
   // return await getFullConfig()
 }

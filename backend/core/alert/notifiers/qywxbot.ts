@@ -22,7 +22,7 @@ export async function sendQywxBotNotification(msg: messageModel, notification: a
     })
 
     if (response.data.errcode === 0) {
-      logger.log(`QYWX Bot notification sent successfully: ${title}`)
+      logger.info(`QYWX Bot notification sent successfully: ${title}`)
     }
     else {
       logger.error(`Failed to send QYWX Bot notification: ${title}, error: ${response.data.errmsg}`)

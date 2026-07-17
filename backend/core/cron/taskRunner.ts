@@ -121,17 +121,17 @@ export async function runCronTask(taskId: number, manual: boolean = false) {
       await db.taskCore.$deleteById(`T_${taskId}`)
       return
     }
-    // logger.log('触发定时任务', task.shell)
+    // logger.info('触发定时任务', task.shell)
     // 跳过禁用的任务
     if (!manual && task.active <= 0) {
-      // logger.log("触发定时任务", task.shell, "（PASS，原因：已被禁用）")
+      // logger.info("触发定时任务", task.shell, "（PASS，原因：已被禁用）")
       return
     }
     // 解析高级配置
     const config = parseTaskConfig(task.config)
     if (isTaskRunning(taskId) && !config.allow_concurrency) {
       // 跳过正在运行的任务
-      // logger.log('触发定时任务', task.shell, '（PASS，原因：正在运行）')
+      // logger.info('触发定时任务', task.shell, '（PASS，原因：正在运行）')
       return
     }
     // 拼接运行前/后命令
@@ -184,7 +184,7 @@ export function stopCronTask(taskId: number) {
     if (signal === 'SIGTERM' || signal === 'SIGKILL') {
       removeInstance(taskId, runId)
       isExited = true
-      // logger.log(`定时任务 ${taskId} 已被终止`);
+      // logger.info(`定时任务 ${taskId} 已被终止`);
     }
   })
   const checkInterval = setInterval(() => {
@@ -197,7 +197,7 @@ export function stopCronTask(taskId: number) {
       clearInterval(checkInterval)
       if (runInstances.get(taskId)?.has(runId)) {
         child.kill('SIGKILL') // 强制终止
-        // logger.log(`定时任务 ${taskId} 已被强制终止`);
+        // logger.info(`定时任务 ${taskId} 已被强制终止`);
       }
     }
   }, 1000) // 每秒检查一次

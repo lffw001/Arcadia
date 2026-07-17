@@ -29,7 +29,7 @@ export async function registerCleanupCron(cronExpression?: string) {
     validateCronExpression(expression)
   }
   catch (e: any) {
-    logger.warn(`[定时清理] cron 表达式无效: ${expression}`, e.message || e)
+    logger.warn(`[日志与数据清理任务] 定时表达式无效: ${expression}`, e.message || e)
     removeTask(CLEANUP_CRON_ID)
     return
   }
@@ -44,9 +44,7 @@ export async function registerCleanupCron(cronExpression?: string) {
       await runCleanup()
     }
     catch (e: any) {
-      logger.error('[定时清理] 执行异常', e.message || e)
+      logger.error('[日志与数据清理任务] 执行异常', e.message || e)
     }
   })
-
-  logger.log(`[定时清理] 已注册 cron: ${expression}`)
 }

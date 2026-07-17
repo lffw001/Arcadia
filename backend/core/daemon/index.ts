@@ -428,7 +428,7 @@ export async function initDaemonTask(): Promise<void> {
     }
   }
 
-  logger.log('守护任务初始化完毕')
+  logger.info('守护任务初始化完成')
 }
 
 /**

@@ -48,7 +48,7 @@ export async function sendWxPusherNotification(msg: messageModel, notification: 
     })
 
     if (response.data.code === 1000) {
-      logger.log(`WxPusher notification sent successfully: ${title}`)
+      logger.info(`WxPusher notification sent successfully: ${title}`)
     }
     else {
       logger.error(`Failed to send WxPusher notification: ${title}, error: ${response.data.message}`)

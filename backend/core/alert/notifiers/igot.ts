@@ -28,7 +28,7 @@ export async function sendIgotNotification(msg: messageModel, notification: aler
       try {
         const parsedData = JSON.parse(data)
         if (parsedData.ret === 0) {
-          logger.log(`iGot notification sent successfully: ${title}`)
+          logger.info(`iGot notification sent successfully: ${title}`)
         }
         else {
           logger.error(`Failed to send iGot notification: ${title}, error: ${parsedData.errMsg}`)
@@ -39,7 +39,7 @@ export async function sendIgotNotification(msg: messageModel, notification: aler
       }
     }
     else if (data.ret === 0) {
-      logger.log(`iGot notification sent successfully: ${title}`)
+      logger.info(`iGot notification sent successfully: ${title}`)
     }
     else {
       logger.error(`Failed to send iGot notification: ${title}, error: ${data.errMsg}`)
