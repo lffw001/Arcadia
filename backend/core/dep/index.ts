@@ -105,7 +105,7 @@ class SerialQueue {
         await task()
       }
       catch (e: any) {
-        logger.error('[dep] queue task error:', e?.message ?? e)
+        logger.error('[依赖管理] 队列任务异常', e?.message ?? e)
       }
     }
     this.running = false
@@ -124,13 +124,15 @@ function spawnDepScript(args: string[]): Promise<{ stdout: string, stderr: strin
   })
 }
 
-/** 服务器启动时调用，失败仅记录日志不抛出。 */
-export async function initDepSync(): Promise<void> {
+/**
+ * 初始化依赖管理系统，同步依赖安装状态
+*/
+export async function initDepManagerSystem(): Promise<void> {
   try {
-    await _doSync()
+    await syncDepsCore()
   }
   catch (e: any) {
-    logger.error('[dep] initDepSync error:', e?.message ?? e)
+    logger.error('[依赖管理] 同步安装状态异常', e?.message ?? e)
   }
 }
 
@@ -138,10 +140,10 @@ export async function syncDeps(): Promise<{ updated: number }> {
   if (_syncLock === 'running') {
     throw new Error('已有同步任务在运行中，请稍后再试')
   }
-  return _doSync()
+  return syncDepsCore()
 }
 
-async function _doSync(): Promise<{ updated: number }> {
+async function syncDepsCore(): Promise<{ updated: number }> {
   _syncLock = 'running'
   let updated = 0
   try {
@@ -240,7 +242,7 @@ async function _runInstallOne(dep: { id: number, name: string, ecosystem: string
         ver = await _queryVersion(dep.ecosystem, dep.name)
       }
       catch (e: any) {
-        logger.error(`[dep] queryVersion ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
+        logger.error(`[依赖管理] 查询 ${dep.ecosystem}/${dep.name} 版本失败`, e?.message ?? e)
       }
       await db.dependencyManage.update({
         where: { id: dep.id },
@@ -257,12 +259,12 @@ async function _runInstallOne(dep: { id: number, name: string, ecosystem: string
     }
   }
   catch (e: any) {
-    logger.error(`[dep] install ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
+    logger.error(`[依赖管理] 安装 ${dep.ecosystem}/${dep.name} 失败`, e?.message ?? e)
     try {
       await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED })
     }
-    catch { /* ignore db error in recovery */ }
+    catch {}
   }
 }
 
@@ -297,7 +299,7 @@ async function _runUninstallOne(dep: { id: number, name: string, ecosystem: stri
     }
   }
   catch (e: any) {
-    logger.error(`[dep] uninstall ${dep.ecosystem}/${dep.name} error:`, e?.message ?? e)
+    logger.error(`[依赖管理] 卸载 ${dep.ecosystem}/${dep.name} 失败`, e?.message ?? e)
     try {
       await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED })

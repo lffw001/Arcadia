@@ -105,7 +105,7 @@ API.post('/save', async (request: Request, response: Response) => {
     const data = cleanProperties(params.body, DAEMON_TASK_FIELDS)
 
     if (id) {
-      // ── 更新 ──
+      // 更新
       const existing = await db.daemonTask.findFirst({ where: { id } })
       if (!existing) {
         return response.send(API_STATUS_CODE.fail('任务不存在'))
@@ -155,7 +155,7 @@ API.post('/save', async (request: Request, response: Response) => {
       response.send(API_STATUS_CODE.okData(record))
     }
     else {
-      // ── 创建 ──
+      // 创建
       if (!data.name || !data.file_path) {
         return response.send(API_STATUS_CODE.fail('创建任务需要提供 name 和 file_path'))
       }

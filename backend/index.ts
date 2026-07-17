@@ -10,7 +10,7 @@ import { initTokenCache as initOpenApiAccessKeyCache } from './api/openApi'
 import { initLog } from './core/log'
 import { initTerminalServer } from './server/terminal'
 import { initDaemonLogServer } from './server/daemonLog'
-import { initDepSync } from './core/dep'
+import { initDepManagerSystem } from './core/dep'
 
 async function startServer() {
   // 初始化操作日志持久化
@@ -32,7 +32,7 @@ async function startServer() {
   await initDaemonTask()
 
   // 初始化依赖管理系统
-  initDepSync()
+  initDepManagerSystem()
 
   // 创建 API 认证中间件
   const apiAuthentication = createApiAuthentication()
