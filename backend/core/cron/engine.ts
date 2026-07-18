@@ -40,6 +40,7 @@ export function setTask(id: string, cron: string, callback: () => void) {
   }
   const cronTaskInstance: TaskInstance = {} as any
   id2Task[id] = cronTaskInstance
+  cronTaskInstance.cron = cron
   cronTaskInstance.callback = callback
   cronTaskInstance.job = new CronJob(
     cron,

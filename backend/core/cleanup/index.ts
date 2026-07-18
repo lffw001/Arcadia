@@ -33,7 +33,7 @@ export async function runCleanup(
   const result: Record<string, any> = {}
 
   // 一次性查询所有系统配置（仅在需要读取配置时）
-  const config = days !== null ? null : await getSystemModuleConfig()
+  const config = typeof days === 'number' ? null : await getSystemModuleConfig()
 
   // 代码文件运行日志（arcadia rmlog）
   if (types.includes('log')) {
@@ -81,7 +81,7 @@ export async function runCleanup(
 }
 
 function getRetentionDays(config: ConfigDataSystem | null, key: ConfigKeySystem, override?: number | null): number {
-  if (override != null)
+  if (typeof override === 'number')
     return override
   return parseRetentionDays(config![key])
 }
