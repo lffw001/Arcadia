@@ -157,7 +157,7 @@ export async function runCronTask(taskId: number, manual: boolean = false) {
     return { runId, child }
   }
   catch (e) {
-    logger.error(`定时任务 ${taskId} 执行异常`, e)
+    logger.error(`定时任务 ${taskId} 运行异常`, e)
   }
 }
 
@@ -231,7 +231,7 @@ function runTaskModel(
   return execShell(task.shell, {
     callback: (error, stdout, _stderr) => {
       if (error) {
-        logger.warn(`定时任务 "${task.shell}" 执行异常`, error.toString().substring(stdout.length - 1000))
+        logger.warn(`定时任务 "${task.name}" 执行异常`, error.toString().substring(stdout.length - 1000))
       }
     },
     onExit: (code) => {
