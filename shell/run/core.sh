@@ -385,16 +385,20 @@ function run_script_core() {
         # 运行超时（命令选项）
         [[ "${RUN_OPTION_TIMEOUT}" == "true" ]] && run_cmd="timeout ${RUN_OPTION_TIMEOUT_OPTIONS} bash -c \"${run_cmd}\""
         # 执行
-        bash -c "${run_cmd}"
+        local _exit_code=0
+        bash -c "set -o pipefail ; ${run_cmd}" || _exit_code=$?
         if [[ "${RUN_OPTION_NO_LOG}" != "true" ]]; then
             # 记录执行结束时间
             _record_log_end_title "执行完毕，总用时 $(($(date +%s) - start_timestamp)) 秒"
         fi
+        return ${_exit_code}
     fi
 }
 
 function run_script_main() {
     local LogFilePath LogFileName arg_group_item env_value operation_title
+    local _run_exit_code=0
+
     # 记录编排进程 PID（供 stop 命令终止进程树）
     local _run_pid_file="${LogTmpDir}/.run_${FileName}_$$.pid"
     make_dir "${LogTmpDir}"
@@ -461,6 +465,7 @@ function run_script_main() {
                 # 延迟执行（命令选项）
                 [[ "${RUN_OPTION_DELAY}" == "true" ]] && random_delay
                 run_script_core "${base_cmd}"
+                _run_exit_code=$?
             done
             # 恢复原有变量值以应用下一次重组匹配
             eval export "${RUN_OPTION_RECOMBINE_ENV_NAME}"=\""${RUN_OPTION_RECOMBINE_ENV_ORIGINAL_VALUE}"\"
@@ -494,6 +499,7 @@ function run_script_main() {
                 # 延迟执行（命令选项）
                 [[ "${RUN_OPTION_DELAY}" == "true" ]] && random_delay
                 run_script_core "${base_cmd}"
+                _run_exit_code=$?
             done
             let env_index++
         done
@@ -512,6 +518,7 @@ function run_script_main() {
             # 延迟执行（命令选项）
             [[ "${RUN_OPTION_DELAY}" == "true" ]] && random_delay
             run_script_core "${base_cmd}"
+            _run_exit_code=$?
         done
     fi
 
@@ -541,4 +548,6 @@ function run_script_main() {
     if [[ "${RUN_REMOTE}" == "true" && "${CLI_CONFIG_ENABLE_AUTO_DELETE_REMOTE_FILE}" == "true" ]]; then
         rm -rf "${FileDir}/${FileName}.${FileSuffix}"
     fi
+
+    return ${_run_exit_code}
 }

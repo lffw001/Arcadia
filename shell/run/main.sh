@@ -1,6 +1,8 @@
 #!/bin/bash
 
 function command_run_main() {
+    local _run_exit_code=0
+
     ## 匹配代码文件
     import core/script
     find_script "${1}"
@@ -43,11 +45,14 @@ function command_run_main() {
     fi
 
     run_script_main
+    _run_exit_code=$?
 
     # 执行用户自定义执行后脚本
     if [[ "${CLI_CONFIG_ENABLE_TASK_AFTER_EXTRA}" == "true" ]] && [[ -f $FileTaskAfterExtra ]]; then
         source $FileTaskAfterExtra
     fi
+
+    return ${_run_exit_code}
 }
 
 function reset_options() {
