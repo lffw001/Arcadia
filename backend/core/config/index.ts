@@ -8,7 +8,6 @@ import {
   ConfigKeyUser,
   ConfigModule,
   DEFAULT_CONFIG_VALUES,
-  DEFAULT_SYSTEM_CONFIG_VALUES,
 } from '../type/config'
 import { generateCliConfigSh } from './cli'
 import { applySystemTimezone, detectAndSaveSourcesIfEmpty } from './system'
@@ -143,13 +142,9 @@ export async function getUserModuleConfig() {
   const map = await getModuleConfigMap(ConfigModule.USER)
   const result = {} as ConfigDataUser
 
-  // 处理默认值并转换数据类型
   for (const key of Object.values(ConfigKeyUser)) {
     const value = map[key] || DEFAULT_CONFIG_VALUES[ConfigModule.USER][key]
     switch (key) {
-      case ConfigKeyUser.CRON_TASK_HISTORY_DAYS:
-        result[key] = Number(value)
-        break
       case ConfigKeyUser.TOTP_ENABLED:
         result[key] = value === 'true'
         break
@@ -187,7 +182,7 @@ export async function getSystemModuleConfig() {
   const result = {} as ConfigDataSystem
 
   for (const key of Object.values(ConfigKeySystem)) {
-    const value = map[key] ?? DEFAULT_SYSTEM_CONFIG_VALUES[key]
+    const value = map[key] ?? DEFAULT_CONFIG_VALUES[ConfigModule.SYSTEM][key]
     result[key] = value
   }
   return result
@@ -308,19 +303,68 @@ async function initCliConfig() {
  */
 async function initSystemConfig() {
   const config = await getSystemModuleConfig()
-  if (config.SYSTEM_TIMEZONE) {
-    applySystemTimezone(config.SYSTEM_TIMEZONE)
+  if (config.timezone) {
+    applySystemTimezone(config.timezone)
   }
   // 检测当前系统软件源
   detectAndSaveSourcesIfEmpty().catch(() => {})
 }
 
 /**
+ * 迁移旧版 System 配置键名（UPPER_SNAKE_CASE → camelCase）
+ */
+async function _migrateSystemConfigKeys(): Promise<void> {
+  const LEGACY_SYSTEM_KEYS: Record<string, ConfigKeySystem> = {
+    SYSTEM_TIMEZONE: ConfigKeySystem.TIMEZONE,
+    NPM_REGISTRY: ConfigKeySystem.NPM_REGISTRY,
+    PIP_INDEX_URL: ConfigKeySystem.PIP_INDEX_URL,
+    APT_MIRROR_URL: ConfigKeySystem.APT_MIRROR_URL,
+    GEM_REGISTRY: ConfigKeySystem.GEM_REGISTRY,
+    LOG_RETENTION_DAYS: ConfigKeySystem.LOG_RETENTION_DAYS,
+    MESSAGE_RETENTION_DAYS: ConfigKeySystem.MESSAGE_RETENTION_DAYS,
+    TASK_HISTORY_RETENTION_DAYS: ConfigKeySystem.TASK_HISTORY_RETENTION_DAYS,
+    CLEANUP_CRON_EXPRESSION: ConfigKeySystem.CLEANUP_CRON_EXPRESSION,
+    CLEANUP_CRON_ENABLED: ConfigKeySystem.CLEANUP_CRON_ENABLED,
+  }
+  const legacyKeys = Object.keys(LEGACY_SYSTEM_KEYS)
+  if (legacyKeys.length === 0)
+    return
+  // 查找所有旧的 UPPER_SNAKE_CASE 记录
+  const oldConfigs = await db.config.findMany({
+    where: { module: ConfigModule.SYSTEM, key: { in: legacyKeys } },
+  })
+  if (oldConfigs.length === 0)
+    return
+  // 查找对应的新 camelCase 记录
+  const newKeys = oldConfigs.map(c => LEGACY_SYSTEM_KEYS[c.key]).filter(Boolean)
+  const newConfigMap = new Map<string, configModel>()
+  if (newKeys.length > 0) {
+    const newConfigs = await db.config.findMany({
+      where: { module: ConfigModule.SYSTEM, key: { in: newKeys } },
+    })
+    for (const c of newConfigs)
+      newConfigMap.set(c.key, c)
+  }
+  // 值不同时用旧值覆盖新记录，然后批量删除所有旧记录
+  const idsToDelete: number[] = []
+  for (const old of oldConfigs) {
+    const newKey = LEGACY_SYSTEM_KEYS[old.key]
+    const newRecord = newKey ? newConfigMap.get(newKey) : undefined
+    if (newRecord && newRecord.value !== old.value) {
+      await db.config.$updateById({ id: newRecord.id, data: { value: old.value } })
+    }
+    idsToDelete.push(old.id)
+  }
+  await db.config.$deleteById(idsToDelete)
+}
+
+/**
  * 初始化应用配置
- *
- * @description 清理无效的 module 和 key，初始化所有必需配置，返回完整配置对象
  */
 export async function initConfig() {
+  // 迁移旧版配置（一段时间后移除）
+  await _migrateSystemConfigKeys()
+
   // 清理无效和重复配置
   await cleanInvalidConfigs()
   // 初始化用户配置
@@ -332,6 +376,7 @@ export async function initConfig() {
   // 初始化系统全局配置
   await initSystemConfig()
   // logger.info('初始化应用配置完成')
+
   // 重新查询并返回完整配置对象
   // return await getFullConfig()
 }

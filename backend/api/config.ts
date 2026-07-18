@@ -8,45 +8,15 @@ import { generateCliConfigSh } from '../core/config/cli'
 import { applySystemTimezone, depSetSource } from '../core/config/system'
 import { registerCleanupCron } from '../core/cron/cleanup'
 
-// 接口参数名（camelCase）内部配置键映射
-const SYSTEM_PARAM_TO_KEY: Record<string, ConfigKeySystem> = {
-  timezone: ConfigKeySystem.SYSTEM_TIMEZONE,
-  npmRegistry: ConfigKeySystem.NPM_REGISTRY,
-  pipIndexUrl: ConfigKeySystem.PIP_INDEX_URL,
-  aptMirrorUrl: ConfigKeySystem.APT_MIRROR_URL,
-  gemRegistry: ConfigKeySystem.GEM_REGISTRY,
-  logRetentionDays: ConfigKeySystem.LOG_RETENTION_DAYS,
-  messageRetentionDays: ConfigKeySystem.MESSAGE_RETENTION_DAYS,
-  taskHistoryRetentionDays: ConfigKeySystem.TASK_HISTORY_RETENTION_DAYS,
-  cleanupCronExpression: ConfigKeySystem.CLEANUP_CRON_EXPRESSION,
-  cleanupCronEnabled: ConfigKeySystem.CLEANUP_CRON_ENABLED,
-}
-const SYSTEM_KEY_TO_PARAM: Record<ConfigKeySystem, string> = {
-  [ConfigKeySystem.SYSTEM_TIMEZONE]: 'timezone',
-  [ConfigKeySystem.NPM_REGISTRY]: 'npmRegistry',
-  [ConfigKeySystem.PIP_INDEX_URL]: 'pipIndexUrl',
-  [ConfigKeySystem.APT_MIRROR_URL]: 'aptMirrorUrl',
-  [ConfigKeySystem.GEM_REGISTRY]: 'gemRegistry',
-  [ConfigKeySystem.LOG_RETENTION_DAYS]: 'logRetentionDays',
-  [ConfigKeySystem.MESSAGE_RETENTION_DAYS]: 'messageRetentionDays',
-  [ConfigKeySystem.TASK_HISTORY_RETENTION_DAYS]: 'taskHistoryRetentionDays',
-  [ConfigKeySystem.CLEANUP_CRON_EXPRESSION]: 'cleanupCronExpression',
-  [ConfigKeySystem.CLEANUP_CRON_ENABLED]: 'cleanupCronEnabled',
-}
-const SYSTEM_PARAM_ECOSYSTEM: Record<string, 'npm' | 'pnpm' | 'pip' | 'apt' | 'gem' | null> = {
-  timezone: null,
-  npmRegistry: 'npm',
-  pipIndexUrl: 'pip',
-  aptMirrorUrl: 'apt',
-  gemRegistry: 'gem',
-  logRetentionDays: null,
-  messageRetentionDays: null,
-  taskHistoryRetentionDays: null,
-  cleanupCronExpression: null,
-  cleanupCronEnabled: null,
-}
-
 export const API: Express = express()
+
+// 系统配置键与软件包生态的映射
+const SYSTEM_KEY_ECOSYSTEM: Partial<Record<ConfigKeySystem, 'npm' | 'pip' | 'apt' | 'gem'>> = {
+  [ConfigKeySystem.NPM_REGISTRY]: 'npm',
+  [ConfigKeySystem.PIP_INDEX_URL]: 'pip',
+  [ConfigKeySystem.APT_MIRROR_URL]: 'apt',
+  [ConfigKeySystem.GEM_REGISTRY]: 'gem',
+}
 
 /**
  * 获取 CLI 功能配置
@@ -110,10 +80,7 @@ API.post('/cli', async (request: Request, response: Response) => {
 API.get('/system', async (_request: Request, response: Response) => {
   try {
     const config = await getSystemModuleConfig()
-    const result = Object.fromEntries(
-      Object.entries(config).map(([k, v]) => [SYSTEM_KEY_TO_PARAM[k as ConfigKeySystem] ?? k, v]),
-    )
-    response.send(API_STATUS_CODE.okData(result))
+    response.send(API_STATUS_CODE.okData(config))
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || '获取系统配置失败'))
@@ -140,31 +107,32 @@ API.post('/system', async (request: Request, response: Response) => {
       ] as const,
     })
     const body = request.body as Record<string, string>
+    const validKeys = new Set(Object.values(ConfigKeySystem))
     const updates: Promise<any>[] = []
-    const sideEffects: Array<{ param: string, value: string }> = []
+    const sideEffects: Array<{ key: ConfigKeySystem, value: string }> = []
     for (const [param, value] of Object.entries(body)) {
-      const configKey = SYSTEM_PARAM_TO_KEY[param]
-      if (!configKey) {
+      if (!validKeys.has(param as ConfigKeySystem)) {
         return response.send(API_STATUS_CODE.fail(`无效的配置键: ${param}`))
       }
+      const configKey = param as ConfigKeySystem
       updates.push(updateConfigValue(configKey, ConfigModule.SYSTEM, value))
-      sideEffects.push({ param, value })
+      sideEffects.push({ key: configKey, value })
     }
     if (updates.length === 0) {
       return response.send(API_STATUS_CODE.fail('没有可更新的配置项'))
     }
     await Promise.all(updates)
-    for (const { param, value } of sideEffects) {
-      if (param === 'timezone' && value) {
+    for (const { key, value } of sideEffects) {
+      if (key === ConfigKeySystem.TIMEZONE && value) {
         applySystemTimezone(value)
       }
       // 软件源仅在传入非空值时才立即应用，空值保留 DB 记录但不重置工具配置
-      const ecosystem = SYSTEM_PARAM_ECOSYSTEM[param]
+      const ecosystem = SYSTEM_KEY_ECOSYSTEM[key]
       if (ecosystem && value) {
         depSetSource(ecosystem, value)
       }
       // 定时清理 cron 配置变化时重新注册
-      if (param === 'cleanupCronExpression') {
+      if (key === ConfigKeySystem.CLEANUP_CRON_EXPRESSION) {
         registerCleanupCron(value).catch(() => {})
       }
     }
