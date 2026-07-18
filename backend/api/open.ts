@@ -4,7 +4,7 @@ import { API_STATUS_CODE } from '../utils/httpUtil'
 import { logger } from '../utils/logger'
 import fs from 'node:fs'
 import { APP_FILE_PATH } from '../core/type'
-import { hasPermission, resolveRoutePermission, verifyToken } from './openApi'
+import { hasPermission, openApiLogMiddleware, resolveRoutePermission, verifyToken } from './openApi'
 
 const api: Express = express()
 
@@ -72,4 +72,5 @@ const OpenAPIAuthentication: RequestHandler = async (req, res, next) => {
 export {
   OpenAPIAuthentication,
   api as OpenAPIExtra,
+  openApiLogMiddleware,
 }

@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { getSystemModuleConfig } from '../config'
 import { ConfigKeySystem } from '../type/config'
 import { CLI_CMD } from '../type/cli'
-import { cleanLoginLogs, cleanServerLogs } from '../log'
+import { cleanLoginLogs, cleanOpenApiLogs, cleanServerLogs } from '../log'
 import { cleanReadMessages } from '../message'
 import db from '../../db'
 import { APP_ROOT_DIR } from '../type'
@@ -12,7 +12,7 @@ import { APP_ROOT_DIR } from '../type'
 /**
  * 支持的清理类型
  *
- * - `log`：系统日志（操作日志 + 登录日志）+ 代码文件运行日志
+ * - `log`：系统日志（操作日志 + 登录日志 + 开放接口日志）+ 代码文件运行日志
  * - `message`：消息中心已读消息
  * - `taskHistory`：定时任务执行统计数据
  */
@@ -47,14 +47,15 @@ export async function runCleanup(
     catch {}
   }
 
-  // 系统日志（操作日志 + 登录日志）
+  // 系统日志（操作日志 + 登录日志 + 开放接口日志）
   if (types.includes('log')) {
     const retentionDays = getRetentionDays(config, ConfigKeySystem.LOG_RETENTION_DAYS, days)
-    const [serverResult, loginResult] = await Promise.all([
+    const [serverResult, loginResult, openApiResult] = await Promise.all([
       cleanServerLogs(retentionDays),
       cleanLoginLogs(retentionDays),
+      cleanOpenApiLogs(retentionDays),
     ])
-    result.log = { serverLog: serverResult.count, loginLog: loginResult.count }
+    result.log = { serverLog: serverResult.count, loginLog: loginResult.count, openApiLog: openApiResult.count }
   }
 
   // 已读消息

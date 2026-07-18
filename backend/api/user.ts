@@ -1,6 +1,6 @@
 import type { Express, Request } from 'express'
 import express from 'express'
-import { API_STATUS_CODE, getClientIP, ip2Address } from '../utils/httpUtil'
+import { API_STATUS_CODE, getClientIP, ip2AddressCached, parseUserAgent } from '../utils/httpUtil'
 import { logger } from '../utils/logger'
 import jwt from 'jsonwebtoken'
 import { randomString } from '../utils'
@@ -121,8 +121,10 @@ async function completeLogin(username: string, password: string, request: Reques
 
   // 记录本次登录日志
   const clientIP = getClientIP(request)
-  void ip2Address(clientIP).then(({ ip, address }) => {
-    void addLoginLog({ ip, address, result: 1 })
+  const ua = request.headers['user-agent'] || ''
+  const { browser, os, device } = parseUserAgent(ua)
+  void ip2AddressCached(clientIP).then(({ ip, address }) => {
+    void addLoginLog({ ip, address, result: 1, browser, os, device })
     if (ip !== '127.0.0.1' && ip !== 'localhost') {
       logger.info(`用户 ${username} 已登录，登录地址：${ip} ${address}`)
     }
@@ -174,7 +176,9 @@ api.post('/auth', async (request, response) => {
   if (!credentialsCheck.valid) {
     logger.warn('登录认证失败', { username, ip: clientIP, reason: credentialsCheck.message, attemptCount: getAuthErrorCount() })
     // 记录登录失败日志
-    void ip2Address(clientIP).then(({ ip, address }) => addLoginLog({ ip, address, result: 0 })).catch(() => {})
+    const ua = request.headers['user-agent'] || ''
+    const { browser, os, device } = parseUserAgent(ua)
+    void ip2AddressCached(clientIP).then(({ ip, address }) => addLoginLog({ ip, address, result: 0, browser, os, device })).catch(() => {})
     responseData.limitTime = 0
     return response.send(API_STATUS_CODE.failData(credentialsCheck.message, responseData))
   }
@@ -232,7 +236,9 @@ api.post('/auth/twoFactor', async (request, response) => {
   if (!credentialsCheck.valid) {
     logger.warn('登录认证失败 (双重认证)', { username, ip: clientIP, reason: credentialsCheck.message, attemptCount: getAuthErrorCount() + 1 })
     // 记录登录失败日志
-    void ip2Address(clientIP).then(({ ip, address }) => addLoginLog({ ip, address, result: 0 })).catch(() => {})
+    const ua = request.headers['user-agent'] || ''
+    const { browser, os, device } = parseUserAgent(ua)
+    void ip2AddressCached(clientIP).then(({ ip, address }) => addLoginLog({ ip, address, result: 0, browser, os, device })).catch(() => {})
     responseData.limitTime = 0
     return response.send(API_STATUS_CODE.failData(credentialsCheck.message, responseData))
   }
@@ -260,7 +266,9 @@ api.post('/auth/twoFactor', async (request, response) => {
     incrementAuthError(curTime.getTime())
     logger.warn('2FA 双重认证失败', { username, ip: clientIP, attemptCount: getAuthErrorCount() })
     // 记录登录失败日志
-    void ip2Address(clientIP).then(({ ip, address }) => addLoginLog({ ip, address, result: 0 })).catch(() => {})
+    const ua = request.headers['user-agent'] || ''
+    const { browser, os, device } = parseUserAgent(ua)
+    void ip2AddressCached(clientIP).then(({ ip, address }) => addLoginLog({ ip, address, result: 0, browser, os, device })).catch(() => {})
     responseData.limitTime = 0
     return response.send(API_STATUS_CODE.failData('动态验证码无效', responseData))
   }

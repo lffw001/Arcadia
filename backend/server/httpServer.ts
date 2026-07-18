@@ -8,7 +8,7 @@ import bodyParser from 'body-parser'
 import { API_STATUS_CODE } from '../utils/httpUtil'
 import { APP_PUBLIC_DIR } from '../core/type'
 import { getJwtSecretSync } from '../core/config'
-import { OpenAPIAuthentication, OpenAPIExtra } from '../api/open'
+import { OpenAPIAuthentication, OpenAPIExtra, openApiLogMiddleware } from '../api/open'
 import { API as ApiFile, OpenAPI as OpenApiFile } from '../api/file'
 import { API as ApiEnv, OpenAPI as OpenApiEnv } from '../api/env'
 import { API as ApiCron, InnerAPI as InnerApiCron, OpenAPI as OpenApiCron } from '../api/cron'
@@ -120,7 +120,7 @@ export function registerApp(apiAuthentication: RequestHandler) {
   openApiRouter.use('/exec', OpenApiExec)
   openApiRouter.use('/message', OpenApiMessage)
   openApiRouter.use('/alert', ApiAlert)
-  app.use('/api/open', OpenAPIAuthentication, openApiRouter)
+  app.use('/api/open', OpenAPIAuthentication, openApiLogMiddleware, openApiRouter)
   const handleOpenApiSyntaxError: ErrorRequestHandler = (err, _req, res, next) => {
     if (err && err?.name === 'SyntaxError') {
       const { message, code } = API_STATUS_CODE.OPEN_API.SYNTAX_ERROR

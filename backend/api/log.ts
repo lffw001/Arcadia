@@ -1,7 +1,7 @@
 import type { Express } from 'express'
 import express from 'express'
 import { API_STATUS_CODE } from '../utils/httpUtil'
-import type { loginLogWhereInput, serverLogWhereInput } from '../db'
+import type { loginLogWhereInput, openApiLogWhereInput, serverLogWhereInput } from '../db'
 import db from '../db'
 import { validateRequestParams } from '../utils'
 import { CLEANUP_TYPES, runCleanup } from '../core/cleanup'
@@ -62,6 +62,35 @@ api.get('/login', async (request, response) => {
       desc = false // 0 升序，1 降序
     }
     const result = await db.loginLog.$page({
+      where,
+      orderBy: { time: desc ? 'desc' : 'asc' },
+      page: String(request.query.page),
+      size: String(request.query.size),
+    })
+    response.send(API_STATUS_CODE.okData(result))
+  }
+  catch (e: any) {
+    response.send(API_STATUS_CODE.fail(e.message || e))
+  }
+})
+
+/**
+ * 开放接口日志分页查询
+ */
+api.get('/openapi', async (request, response) => {
+  try {
+    const where: openApiLogWhereInput = {}
+    // 请求方法过滤
+    const methods = request.query.method ? (request.query.method as string).split(',') : []
+    if (methods.length > 0) {
+      where.OR = methods.map(m => ({ method: { equals: m.toUpperCase() } }))
+    }
+    // 排序
+    let desc = true
+    if (request.query.order === '0') {
+      desc = false
+    }
+    const result = await db.openApiLog.$page({
       where,
       orderBy: { time: desc ? 'desc' : 'asc' },
       page: String(request.query.page),

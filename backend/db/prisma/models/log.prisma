@@ -16,7 +16,26 @@ model loginLog {
   address String   @default("")
   ip      String   @default("")
   result  Int
+  browser String   @default("")
+  os      String   @default("")
+  device  String   @default("")
 
   @@index([time])
   @@index([result])
+}
+
+// 开放接口日志
+model openApiLog {
+  id      Int      @id @default(autoincrement())
+  time    DateTime @default(now())
+  method  String   @default("")
+  path    String   @default("")
+  ip      String   @default("")
+  address String   @default("")
+  browser String   @default("")
+  os      String   @default("")
+  device  String   @default("")
+
+  @@index([time])
+  @@index([method])
 }

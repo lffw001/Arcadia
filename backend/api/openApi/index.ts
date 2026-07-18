@@ -1,7 +1,10 @@
+import type { RequestHandler } from 'express'
 import type { openApiAccessKeyModel } from '../../db'
 import db from '../../db'
 import { randomString } from '../../utils'
 import { logger } from '../../utils/logger'
+import { getClientIP, ip2AddressCached, parseUserAgent } from '../../utils/httpUtil'
+import { enqueueOpenApiLog } from '../../core/log'
 
 // 权限键定义
 export type PermissionKey
@@ -244,4 +247,23 @@ export async function initTokenCache() {
   catch (e: any) {
     logger.error('初始化 OpenAPI 访问令牌缓存失败 =>', e.message || e)
   }
+}
+
+/**
+ * 开放接口日志中间件
+ *
+ * 拦截通过认证的 OpenAPI 请求，异步记录请求元数据到数据库
+ */
+export const openApiLogMiddleware: RequestHandler = (req, res, next) => {
+  const method = req.method
+  const path = req.path
+  res.on('finish', () => {
+    const ip = getClientIP(req)
+    const ua = req.headers['user-agent'] || ''
+    const { browser, os, device } = parseUserAgent(ua)
+    void ip2AddressCached(ip).then(({ address }) => {
+      enqueueOpenApiLog({ method, path, ip, address, browser, os, device })
+    }).catch(() => {})
+  })
+  next()
 }
