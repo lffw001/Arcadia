@@ -55,10 +55,10 @@ export function parseUserAgent(ua: string): { browser: string, os: string, devic
   const result = UAParser(ua)
   const browser = result.browser.name
     ? `${result.browser.name}${result.browser.version ? ` ${result.browser.version.split('.')[0]}` : ''}`
-    : '未知'
+    : ''
   const os = result.os.name
     ? `${result.os.name}${result.os.version ? ` ${result.os.version}` : ''}`
-    : '未知'
+    : ''
   const device = result.device.type
     ? (result.device.type === 'mobile' ? 'Mobile' : result.device.type === 'tablet' ? 'Tablet' : result.device.type)
     : 'Desktop'
@@ -144,7 +144,7 @@ export async function ip2Address(ip: string) {
       },
     })
     if (data) {
-      let address = data.location === '* ' ? '未知' : data.location
+      let address = data.location === '* ' ? '' : data.location
       address = address.replace(/\t/g, ' ')
       return {
         ip,
@@ -157,7 +157,7 @@ export async function ip2Address(ip: string) {
   }
   return {
     ip,
-    address: '未知',
+    address: '',
   }
 }
 
