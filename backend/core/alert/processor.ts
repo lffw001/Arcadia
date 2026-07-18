@@ -81,9 +81,6 @@ async function matchSingleRule(msg: messageModel, rule: alertConfigRuleModel): P
     case 'category':
       fieldValue = msg.category
       break
-    case 'tags':
-      fieldValue = msg.tags
-      break
     case 'source':
       fieldValue = msg.source
       break
