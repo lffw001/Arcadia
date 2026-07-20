@@ -6,7 +6,7 @@ import db from '../db'
 import { getDaemonLogFilePath } from '../core/daemon'
 
 // 单次推送最大字节数，超出时只读最新部分
-const MAX_EMIT_BYTES = 1 * 1024 * 1024 // 1 MB
+const MAX_EMIT_BYTES = 1024 * 1024 // 1 MB
 
 interface LogWatchState {
   taskId: number

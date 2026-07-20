@@ -4,7 +4,7 @@ import { API_STATUS_CODE } from '../utils/httpUtil'
 import type { messageWhereInput } from '../db'
 import db from '../db'
 import { validatePageFixedParams, validateRequestParams } from '../utils'
-import { getUnreadCount, pushUserMessage } from '../core/message/index'
+import { getUnreadCount, pushUserMessage } from '../core/message'
 
 const api: Express = express()
 const apiOpen: Express = express()
