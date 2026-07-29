@@ -33,6 +33,16 @@ async function handleMessageList(request: Request, scope: MessageScope) {
       where.category = { in: categories }
     }
   }
+  // 消息级别过滤（支持逗号分隔多值）
+  if (request.query.type) {
+    const types = (request.query.type as string).split(',').map(s => s.trim()).filter(Boolean)
+    if (types.length === 1) {
+      where.type = { equals: types[0] }
+    }
+    else if (types.length > 1) {
+      where.type = { in: types }
+    }
+  }
   // 状态过滤
   if (request.query.status) {
     where.status = Number.parseInt(request.query.status as string)
@@ -104,6 +114,7 @@ api.get('/list', async (request, response) => {
     validateRequestParams(request, {
       query: [
         ['category', [false, 'string']],
+        ['type', [false, ['info', 'warn', 'error', 'success']]],
         ['status', [false, ['1', '0']]],
       ],
     })
@@ -261,6 +272,7 @@ apiOpen.get('/v1/list', async (request, response) => {
   try {
     validateRequestParams(request, {
       query: [
+        ['type', [false, ['info', 'warn', 'error', 'success']]],
         ['status', [false, ['1', '0']]],
       ],
     })
