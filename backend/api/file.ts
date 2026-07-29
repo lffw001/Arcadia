@@ -6,7 +6,11 @@ import fs from 'node:fs'
 import { Buffer } from 'node:buffer'
 import multer from 'multer'
 import nodePath from 'node:path'
-import type { FileTreeParams } from '../server/fileCore'
+import type {
+  FileTreeParams,
+  SearchFileTreeParams,
+  SearchLogFileTreeParams,
+} from '../server/fileCore'
 import {
   checkPathAccess,
   checkPathBoundary,
@@ -20,6 +24,8 @@ import {
   getFileList,
   getFileTree,
   saveFile,
+  searchFileTree,
+  searchLogFileTree,
 } from '../server/fileCore'
 import { APP_DIR_PATH, APP_DIR_TYPE, APP_ROOT_DIR } from '../core/type'
 import { validateRequestParams } from '../utils'
@@ -78,6 +84,44 @@ function handleFileTreeParams(query: Request['query']): FileTreeParams {
   const onlyDir = query.onlyDir as string === 'true'
   return { type, search, startTime, endTime, onlyDir }
 }
+
+/**
+ * 全局文件搜索（默认）
+ */
+api.get('/search', (request, response) => {
+  try {
+    const search = request.query.search as string || ''
+    if (!search) {
+      response.send(API_STATUS_CODE.okData([]))
+      return
+    }
+    const params: SearchFileTreeParams = { search }
+    response.send(API_STATUS_CODE.okData(searchFileTree(params)))
+  }
+  catch (e: any) {
+    response.send(API_STATUS_CODE.fail(e.message || e))
+  }
+})
+
+/**
+ * 全局文件搜索（日志目录）
+ */
+api.get('/search/log', (request, response) => {
+  try {
+    const search = request.query.search as string || ''
+    const startTime = request.query.startTime as string || ''
+    const endTime = request.query.endTime as string || ''
+    if (!search) {
+      response.send(API_STATUS_CODE.okData([]))
+      return
+    }
+    const params: SearchLogFileTreeParams = { search, startTime, endTime }
+    response.send(API_STATUS_CODE.okData(searchLogFileTree(params)))
+  }
+  catch (e: any) {
+    response.send(API_STATUS_CODE.fail(e.message || e))
+  }
+})
 
 /**
  * 获取文件树

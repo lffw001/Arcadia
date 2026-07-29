@@ -246,6 +246,185 @@ export function getFileTree(type: APP_DIR_TYPE, dirPath: string, params: FileTre
   return result
 }
 
+export interface SearchFileTreeParams {
+  search: string
+}
+
+export interface SearchLogFileTreeParams {
+  search: string
+  startTime: string
+  endTime: string
+}
+
+/**
+ * 全局文件搜索（代码目录）
+ *
+ * @param {object} params - 搜索参数
+ * @param {string} params.search - 搜索关键字（必填）
+ */
+export function searchFileTree(params: SearchFileTreeParams): (FileTree | FileTreeItem)[] {
+  const { search } = params
+  if (!search) {
+    return []
+  }
+
+  const dirPath = APP_ROOT_DIR
+  if (!fs.existsSync(dirPath)) {
+    return []
+  }
+
+  const filterPaths = [
+    ...defaultFilterPaths,
+    APP_DIR_PATH.LOG,
+    APP_DIR_PATH.SRC,
+    APP_DIR_PATH.SHELL,
+    APP_DIR_PATH.CONFIG,
+    APP_DIR_PATH.SAMPLE,
+  ]
+
+  // 关键字匹配：文件/目录名称包含关键字（区分大小写）
+  const matchesSearch = (name: string) => {
+    return name.includes(search)
+  }
+
+  // 递归读取目录，目录保留含匹配后代的节点
+  const readDirs = (currentDir: string): FileTree => {
+    const dirStats = fs.statSync(currentDir)
+    const result: FileTree = {
+      path: currentDir,
+      title: nodePath.basename(currentDir),
+      type: APP_FILE_TYPES.FOLDER,
+      updated_at: dirStats.mtime,
+      created_at: dirStats.birthtime,
+      children: [],
+    }
+    const files = fs.readdirSync(currentDir)
+    const children: (FileTree | FileTreeItem)[] = sortFilesAndFolders(
+      files
+        .filter((item) => {
+          return !excludeRegExp.test(item) && !filterPaths.includes(nodePath.join(currentDir, item))
+        })
+        .map((file) => {
+          const subPath = nodePath.join(currentDir, file)
+          const stats = fs.statSync(subPath)
+          if (stats.isDirectory()) {
+            return readDirs(subPath)
+          }
+          return {
+            path: subPath,
+            name: file,
+            type: APP_FILE_TYPES.FILE,
+            updated_at: stats.mtime,
+            created_at: stats.birthtime,
+          } as FileTreeItem
+        })
+        .filter((item) => {
+          if (item.type === APP_FILE_TYPES.FOLDER) {
+            return (item as FileTree).children.length > 0
+          }
+          return matchesSearch((item as FileTreeItem).name)
+        }) as (FileTree | FileTreeItem)[],
+      true,
+    )
+    result.children = children
+    return result
+  }
+
+  return readDirs(dirPath).children
+}
+
+/**
+ * 全局文件搜索（日志目录）
+ *
+ * @param {object} params - 搜索参数
+ * @param {string} params.search - 搜索关键字（必填）
+ * @param {string} params.startTime - 开始时间
+ * @param {string} params.endTime - 结束时间
+ */
+export function searchLogFileTree(params: SearchLogFileTreeParams): (FileTree | FileTreeItem)[] {
+  const { search, startTime = '', endTime = '' } = params
+  if (!search) {
+    return []
+  }
+
+  const dirPath = APP_DIR_PATH.LOG
+  if (!fs.existsSync(dirPath)) {
+    return []
+  }
+
+  // 关键字匹配：文件/目录名称包含关键字（区分大小写）
+  const matchesSearch = (name: string) => {
+    return name.includes(search)
+  }
+
+  // 文件过滤：.log 后缀 + 时间范围
+  const matchesFileFilter = (item: FileTreeItem) => {
+    if (!item.name.endsWith('.log')) {
+      return false
+    }
+    const matchesStartTime = startTime === '' || fileNameTimeCompare(item.name, startTime) >= 0
+    const matchesEndTime = endTime === '' || fileNameTimeCompare(item.name, endTime) <= 0
+    return matchesStartTime && matchesEndTime
+  }
+
+  // 递归读取目录，目录保留含匹配后代的节点
+  const readDirs = (currentDir: string): FileTree => {
+    const dirStats = fs.statSync(currentDir)
+    const result: FileTree = {
+      path: currentDir,
+      title: nodePath.basename(currentDir),
+      type: APP_FILE_TYPES.FOLDER,
+      updated_at: dirStats.mtime,
+      created_at: dirStats.birthtime,
+      children: [],
+    }
+    const files = fs.readdirSync(currentDir)
+    const children: (FileTree | FileTreeItem)[] = sortFilesAndFolders(
+      files
+        .filter((item) => {
+          return !excludeRegExp.test(item)
+        })
+        .map((file) => {
+          const subPath = nodePath.join(currentDir, file)
+          const stats = fs.statSync(subPath)
+          if (stats.isDirectory()) {
+            return readDirs(subPath)
+          }
+          return {
+            path: subPath,
+            name: file,
+            type: APP_FILE_TYPES.FILE,
+            updated_at: stats.mtime,
+            created_at: stats.birthtime,
+          } as FileTreeItem
+        })
+        .filter((item) => {
+          if (item.type === APP_FILE_TYPES.FOLDER) {
+            return (item as FileTree).children.length > 0
+          }
+          return matchesSearch((item as FileTreeItem).name) && matchesFileFilter(item as FileTreeItem)
+        }) as (FileTree | FileTreeItem)[],
+      true,
+    )
+    children.sort((a, b) => {
+      if (a.type === APP_FILE_TYPES.FOLDER && b.type === APP_FILE_TYPES.FOLDER) {
+        return 0
+      }
+      if (a.type === APP_FILE_TYPES.FOLDER) {
+        return -1
+      }
+      if (b.type === APP_FILE_TYPES.FOLDER) {
+        return 1
+      }
+      return Number(b.updated_at) - Number(a.updated_at)
+    })
+    result.children = children
+    return result
+  }
+
+  return readDirs(dirPath).children
+}
+
 /**
  * 文件目录排序（使文件夹排在数组中位置靠前）
  *
