@@ -114,7 +114,7 @@ api.get('/list', async (request, response) => {
     validateRequestParams(request, {
       query: [
         ['category', [false, 'string']],
-        ['type', [false, ['info', 'warn', 'error', 'success']]],
+        ['type', [false, 'string']],
         ['status', [false, ['1', '0']]],
       ],
     })
@@ -272,7 +272,7 @@ apiOpen.get('/v1/list', async (request, response) => {
   try {
     validateRequestParams(request, {
       query: [
-        ['type', [false, ['info', 'warn', 'error', 'success']]],
+        ['type', [false, 'string']],
         ['status', [false, ['1', '0']]],
       ],
     })
