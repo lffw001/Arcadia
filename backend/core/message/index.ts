@@ -1,30 +1,39 @@
 import type { messageModel, messageWhereInput } from '../../db'
-import CryptoJS from 'crypto-js'
+import { createHash } from 'node:crypto'
 import { db } from '../../db'
 import { validateObject } from '../../utils'
 import type { MessageData } from '../type/message'
 // import { processMessageAlert } from '../alert'
-import { logger } from '../../utils/logger'
 import { socketCommon } from '../../server/socketCommon'
 
-// 消息去重 LRU 缓存
-interface DedupEntry {
-  fingerprint: string
-  messageId: number
-  timestamp: number
+// 消息去重缓存（FIFO 淘汰）
+const DEDUP_MAX_SIZE = 50
+const DEDUP_WINDOW_MS = 5 * 60 * 1000 // 5 分钟
+const dedupCache = new Map<string, number>() // fingerprint → timestamp
+
+/**
+ * 检查是否重复消息
+ */
+function isDuplicate(fingerprint: string): boolean {
+  const timestamp = dedupCache.get(fingerprint)
+  if (timestamp === undefined)
+    return false
+  if (Date.now() - timestamp < DEDUP_WINDOW_MS)
+    return true
+  // 过期，清除
+  dedupCache.delete(fingerprint)
+  return false
 }
 
-const DEDUP_MAX_SIZE = 1000
-const DEDUP_WINDOW_MS = 5 * 60 * 1000 // 5 分钟
-const dedupCache = new Map<string, DedupEntry>()
-
-function dedupEvict() {
+/**
+ * 注册新消息到去重缓存
+ */
+function registerDedup(fingerprint: string) {
+  dedupCache.set(fingerprint, Date.now())
   if (dedupCache.size > DEDUP_MAX_SIZE) {
-    // 删除最早插入的条目（Map 按插入顺序迭代）
     const firstKey = dedupCache.keys().next().value
-    if (firstKey !== undefined) {
+    if (firstKey !== undefined)
       dedupCache.delete(firstKey)
-    }
   }
 }
 
@@ -43,83 +52,33 @@ function validateMessageLength(data: MessageData) {
 
 /**
  * 发送消息
+ * @returns true=新消息已创建，false=重复消息已丢弃
  */
-export async function sendMessage(data: MessageData) {
-  if (!data.title) {
-    logger.error('[Message] sendMessage: title 不能为空')
-    throw new Error('title 不能为空')
-  }
-  if (!data.content) {
-    logger.error('[Message] sendMessage: content 不能为空')
-    throw new Error('content 不能为空')
-  }
-  validateObject(data, [
+export async function sendMessage(data: MessageData): Promise<boolean> {
+  const title = (data.title ?? '').trim()
+  const content = (data.content ?? '').trim()
+  const category = data.category || 'system'
+  const type = data.type || 'info'
+
+  validateObject({ title, content, category, type }, [
     ['title', [true, 'string']],
     ['content', [true, 'string']],
-    ['source', [false, 'string']],
     ['category', [false, 'string']],
     ['type', [false, ['info', 'error', 'warn', 'success']]],
   ])
-  if (!data.source) {
-    data.source = 'system'
-  }
-  // 内容长度校验
-  validateMessageLength(data)
-  // 构造 DB 记录
-  const record: { title: string, content: string, source: string, category?: string, type?: string } = {
-    title: data.title,
-    content: data.content,
-    source: data.source,
-  }
-  if (data.category)
-    record.category = data.category
-  if (data.type)
-    record.type = data.type
+  validateMessageLength({ title, content })
 
   // 消息去重
-  const contentHash = CryptoJS.MD5(record.content).toString()
-  const fingerprint = `${record.source}:${record.title}:${contentHash}`
-  const now = Date.now()
-  const existing = dedupCache.get(fingerprint)
+  const contentHash = createHash('md5').update(content).digest('hex')
+  const fingerprint = `${title}:${contentHash}`
+  if (isDuplicate(fingerprint))
+    return false
 
-  if (existing && (now - existing.timestamp) < DEDUP_WINDOW_MS) {
-    // 检查对应消息是否未读
-    const existingMsg = await db.message.findUnique({ where: { id: existing.messageId } })
-    if (existingMsg && existingMsg.status === 0) {
-      // 合并：repeat_count + 1，刷新 create_time
-      const updated = await db.message.update({
-        where: { id: existing.messageId },
-        data: {
-          repeat_count: { increment: 1 },
-          create_time: new Date(),
-        },
-      }) as messageModel
+  // 插入
+  const msg = await db.message.$create({ title, content, category, type }) as messageModel
 
-      // 更新缓存时间戳
-      dedupCache.set(fingerprint, { fingerprint, messageId: existing.messageId, timestamp: now })
-
-      // 推送更新事件
-      socketCommon.emit('message:update', {
-        id: updated.id,
-        category: updated.category,
-        type: updated.type,
-        title: updated.title,
-        repeat_count: updated.repeat_count,
-        create_time: updated.create_time,
-      })
-
-      return updated
-    }
-    // 已读或不存在，清除缓存条目，继续走正常插入流程
-    dedupCache.delete(fingerprint)
-  }
-
-  // 正常插入
-  const msg = await db.message.$create(record) as messageModel
-
-  // 记录到去重缓存
-  dedupCache.set(fingerprint, { fingerprint, messageId: msg.id, timestamp: now })
-  dedupEvict()
+  // 注册去重缓存
+  registerDedup(fingerprint)
 
   // 监控告警
   // await processMessageAlert(msg)
@@ -133,24 +92,22 @@ export async function sendMessage(data: MessageData) {
     create_time: msg.create_time,
   })
 
-  return msg
+  return true
 }
 
 /**
  * 面向外部用户集成的消息推送方法
  *
- * category 固定为 user，不接受 source 字段
+ * category 固定为 user
  * title 和 content 为必填，缺失时直接抛出错误
  */
 export async function pushUserMessage(data: { title: string, content: string, type?: 'info' | 'warn' | 'error' | 'success' }) {
-  const messageData: MessageData = {
+  return await sendMessage({
     title: data.title,
     content: data.content,
-    source: 'user',
     category: 'user',
     type: data.type ?? 'info',
-  }
-  return await sendMessage(messageData)
+  })
 }
 
 /**

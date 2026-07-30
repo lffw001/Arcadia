@@ -38,7 +38,7 @@ export async function runCleanup(
   // 代码文件运行日志（arcadia rmlog）
   if (types.includes('log')) {
     try {
-      const args = days !== null ? [String(days)] : []
+      const args = typeof days === 'number' ? [String(days)] : []
       await promisify(exec)(`${CLI_CMD.RMLOG} ${args.join(' ')}`.trim(), {
         cwd: APP_ROOT_DIR,
         timeout: 60_000,

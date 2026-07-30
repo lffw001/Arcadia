@@ -81,9 +81,6 @@ async function matchSingleRule(msg: messageModel, rule: alertConfigRuleModel): P
     case 'category':
       fieldValue = msg.category
       break
-    case 'source':
-      fieldValue = msg.source
-      break
     default:
       // 不支持的类型，默认不匹配
       return false

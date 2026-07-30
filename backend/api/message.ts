@@ -88,7 +88,7 @@ async function handleMessageDetail(id: number, scope: MessageScope) {
  * 标记已读（支持批量和全部）
  */
 async function handleMarkRead(ids: number[] | null, scope: MessageScope, status: number) {
-  const where: messageWhereInput = { status: 0 }
+  const where: messageWhereInput = { status: status === 1 ? 0 : 1 }
   if (scope === 'user')
     where.category = 'user'
   if (ids)
@@ -233,7 +233,7 @@ api.delete('/all', async (request, response) => {
     })
     const { status } = params.body
     const where: messageWhereInput = {}
-    if (status) {
+    if (status !== undefined) {
       where.status = status
     }
     const result = await db.message.deleteMany({ where })

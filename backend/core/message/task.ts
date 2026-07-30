@@ -22,7 +22,6 @@ export async function notifyTaskFailure(info: taskRunInfo) {
     await sendMessage({
       title: '定时任务运行失败',
       content: `任务名称：${info.task.name}\n任务 ID：${info.task.id}\n执行时长：${formatDuration(info.duration)}\n失败时间：${new Date(info.endTime).toLocaleString()}`,
-      source: `cron@${info.task.id}`,
       category: 'cron',
       type: 'error',
     })
