@@ -1,4 +1,5 @@
 import type { messageModel, messageWhereInput } from '../../db'
+import CryptoJS from 'crypto-js'
 import { db } from '../../db'
 import { validateObject } from '../../utils'
 import type { MessageData } from '../type/message'
@@ -41,12 +42,9 @@ function validateMessageLength(data: MessageData) {
 }
 
 /**
- * 发送消息（内部调用方法）
+ * 发送消息
  */
-interface messageInfo {
-  taskId?: number
-}
-export async function sendMessage(data: MessageData, info: messageInfo = {}) {
+export async function sendMessage(data: MessageData) {
   if (!data.title) {
     logger.error('[Message] sendMessage: title 不能为空')
     throw new Error('title 不能为空')
@@ -67,9 +65,6 @@ export async function sendMessage(data: MessageData, info: messageInfo = {}) {
   }
   // 内容长度校验
   validateMessageLength(data)
-  if (info.taskId) {
-    logger.debug(`发送消息任务ID:${info.taskId}, data:`, data)
-  }
   // 构造 DB 记录
   const record: { title: string, content: string, source: string, category?: string, type?: string } = {
     title: data.title,
@@ -82,7 +77,8 @@ export async function sendMessage(data: MessageData, info: messageInfo = {}) {
     record.type = data.type
 
   // 消息去重
-  const fingerprint = `${record.source}:${record.title}:${record.content.substring(0, 50)}`
+  const contentHash = CryptoJS.MD5(record.content).toString()
+  const fingerprint = `${record.source}:${record.title}:${contentHash}`
   const now = Date.now()
   const existing = dedupCache.get(fingerprint)
 
