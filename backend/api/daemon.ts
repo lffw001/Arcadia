@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express'
 import express from 'express'
 import { API_STATUS_CODE } from '../utils/httpUtil'
 import { validateCronExpression } from '../core/cron/engine'
+import type { daemonTaskModel } from '../db'
 import {
   checkNameAvailable,
   deleteDaemonTask,
@@ -48,7 +49,7 @@ const DAEMON_TASK_FIELDS = [
  */
 API.get('/', async (_request: Request, response: Response) => {
   try {
-    const tasks = await db.daemonTask.findMany({ orderBy: { id: 'asc' } })
+    const tasks = await db.daemonTask.$list({ orderBy: { id: 'asc' } })
     const statusMap = await getAllProcessStatuses(tasks.map(t => t.name))
     const result = tasks.map((task) => {
       const pm2Status = statusMap.get(task.name) ?? { status: 'not-started' as const }
@@ -106,7 +107,7 @@ API.post('/save', async (request: Request, response: Response) => {
 
     if (id) {
       // 更新
-      const existing = await db.daemonTask.findFirst({ where: { id } })
+      const existing = await db.daemonTask.$getById(id)
       if (!existing) {
         return response.send(API_STATUS_CODE.fail('任务不存在'))
       }
@@ -132,7 +133,7 @@ API.post('/save', async (request: Request, response: Response) => {
         }
       }
 
-      const record = await db.daemonTask.update({ where: { id }, data })
+      const record = await db.daemonTask.$updateById({ id, data })
 
       // 名称变更时清理旧 PM2 进程，防止孤儿进程
       if (data.name && data.name !== existing.name) {
@@ -179,7 +180,7 @@ API.post('/save', async (request: Request, response: Response) => {
 
       // id 已由 cleanProperties 排除，name 和 file_path 已在上方校验
       const { id: _id, ...createData } = data as Record<string, unknown>
-      const record = await db.daemonTask.create({ data: createData as any })
+      const record = await db.daemonTask.$create(createData as daemonTaskModel)
 
       if (record.restart_cron && record.active === 1) {
         updateDaemonCron(record.id, record.restart_cron)

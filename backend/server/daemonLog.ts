@@ -86,7 +86,7 @@ export function initDaemonLogServer(io: Server): void {
   ns.on('connection', (socket: Socket) => {
     socket.on('daemon:log:subscribe', async ({ id }: { id: number }) => {
       try {
-        const task = await db.daemonTask.findFirst({ where: { id } })
+        const task = await db.daemonTask.$getById(id)
         if (!task || !task.log_name)
           return
         const filePath = getDaemonLogFilePath({ log_dir: task.log_dir, log_name: task.log_name })

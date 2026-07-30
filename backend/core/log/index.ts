@@ -14,7 +14,7 @@ export function initLog() {
  */
 export async function addServerLog(type: string, content: string) {
   try {
-    await db.serverLog.create({ data: { type, content } })
+    await db.serverLog.$create({ type, content })
   }
   catch {
     // 静默失败，避免触发循环调用
@@ -27,18 +27,14 @@ export async function addServerLog(type: string, content: string) {
 export async function addLoginLog(data: { ip: string, address: string, result: number, browser?: string, os?: string, device?: string }) {
   if (!data.ip && !data.address)
     return
-  await db.loginLog.create({ data })
+  await db.loginLog.$create(data)
 }
 
 /**
  * 获取上次成功登录信息
  */
 export async function getLastLoginInfo() {
-  const records = await db.loginLog.findMany({
-    where: { result: 1 },
-    orderBy: { time: 'desc' },
-    take: 2,
-  })
+  const records = await db.loginLog.$list({ where: { result: 1 }, orderBy: { time: 'desc' }, take: 2 })
   if (records[1]) {
     const { ip, address, time } = records[1]
     return { ip, address, time }
@@ -110,7 +106,7 @@ async function flushOpenApiLogBuffer() {
     return
   const batch = openApiLogBuffer.splice(0)
   try {
-    await db.openApiLog.createMany({ data: batch })
+    await db.openApiLog.$create(batch)
   }
   catch {
     // 写入失败时将数据放回队列，缓冲区上限 5000 条，超限丢弃最旧数据

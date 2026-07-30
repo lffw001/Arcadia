@@ -3,7 +3,7 @@ import { Prisma } from './generated/prisma/client'
 export interface PageResult<T> { data: T, total?: number, page: number, size: number }
 
 // https://github.com/prisma/prisma/blob/main/packages/client/src/runtime/core/types/exported/Result.ts#L96
-export interface GetBatchResult { count: number }
+export interface BatchPayload { count: number }
 
 export function clean(model: any, o: any): any {
   if (!o)
@@ -56,22 +56,22 @@ export function withMyFunc() {
       model: {
         $allModels: {
 
-          $create<T, A extends Prisma.Args<T, 'create'> = Prisma.Args<T, 'create'>, R = Prisma.Result<T, A, 'create'> | Prisma.Result<T, A, 'createMany'>>(
+          $create<T, A extends Prisma.Args<T, 'create'> = Prisma.Args<T, 'create'>, D extends A['data'] | A['data'][] = A['data']>(
             this: T,
-            data: A['data'] | A['data'][],
+            data: D,
             opts?: Omit<A, 'data'>,
-          ): Promise<R> {
+          ): Promise<D extends readonly any[] ? Prisma.Result<T, A, 'create'> | BatchPayload : Prisma.Result<T, A, 'create'>> {
             if (typeof data !== 'string' && Array.isArray(data)) {
               if (data.length === 1) {
                 data = data[0]
               }
               else {
                 const args = opts ? { data, ...opts } : { data }
-                return (this as any).createMany(args) as Promise<R>
+                return (this as any).createMany(args)
               }
             }
             const args = opts ? { data, ...opts } : { data }
-            return (this as any).create(args) as Promise<R>
+            return (this as any).create(args)
           },
 
           $updateById<T, A extends Prisma.Args<T, 'update'> = Prisma.Args<T, 'update'>, R = Prisma.Result<T, A, 'update'>>(
@@ -125,14 +125,13 @@ export function withMyFunc() {
 
           $list<T, A extends Prisma.Args<T, 'findMany'> = Prisma.Args<T, 'findMany'>, R = Prisma.Result<T, A, 'findMany'>>(
             this: T,
-            where?: A['where'],
-            orderBy?: A['orderBy'],
+            query?: Omit<Prisma.Args<T, 'findMany'>, 'select' | 'include' | 'omit'>,
             options?: A,
           ): Promise<R> {
             return (this as any).findMany({
-              where: clean(this, where),
-              orderBy,
               ...cleanArgs(options, ['where', 'orderBy']),
+              ...query,
+              where: clean(this, query?.where),
             })
           },
 

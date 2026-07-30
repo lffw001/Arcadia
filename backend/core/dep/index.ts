@@ -149,7 +149,7 @@ async function syncDepsCore(): Promise<{ updated: number }> {
   try {
     for (const eco of ECOSYSTEMS) {
       const installedMap = await _fetchInstalledMap(eco)
-      const deps = await db.dependencyManage.findMany({ where: { ecosystem: eco } })
+      const deps = await db.dependencyManage.$list({ where: { ecosystem: eco } })
       for (const dep of deps) {
         // 跳过正在操作中的记录，避免覆盖进行中的状态
         if (dep.status === DepStatus.INSTALLING || dep.status === DepStatus.UNINSTALLING)
@@ -158,8 +158,8 @@ async function syncDepsCore(): Promise<{ updated: number }> {
         const ver = installedMap.get(base.toLowerCase()) ?? ''
         const newStatus = ver ? DepStatus.INSTALLED : DepStatus.NOT_INSTALLED
         if (dep.installed_ver !== ver || dep.status !== newStatus) {
-          await db.dependencyManage.update({
-            where: { id: dep.id },
+          await db.dependencyManage.$updateById({
+            id: dep.id,
             data: { installed_ver: ver, status: newStatus },
           })
           updated++
@@ -230,7 +230,7 @@ export function enqueueInstall(deps: Array<{ id: number, name: string, ecosystem
 
 async function _runInstallOne(dep: { id: number, name: string, ecosystem: string }) {
   try {
-    await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.INSTALLING, last_error: '' } })
+    await db.dependencyManage.$updateById({ id: dep.id, data: { status: DepStatus.INSTALLING, last_error: '' } })
     socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.INSTALLING })
 
     const { stdout, stderr, code } = await spawnDepScript(['install', dep.ecosystem, dep.name])
@@ -244,15 +244,15 @@ async function _runInstallOne(dep: { id: number, name: string, ecosystem: string
       catch (e: any) {
         logger.error(`[依赖管理] 查询 ${dep.ecosystem}/${dep.name} 版本失败`, e?.message ?? e)
       }
-      await db.dependencyManage.update({
-        where: { id: dep.id },
+      await db.dependencyManage.$updateById({
+        id: dep.id,
         data: { status: DepStatus.INSTALLED, installed_ver: ver, last_error: '' },
       })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.INSTALLED, installed_ver: ver })
     }
     else {
-      await db.dependencyManage.update({
-        where: { id: dep.id },
+      await db.dependencyManage.$updateById({
+        id: dep.id,
         data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
       })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
@@ -261,7 +261,7 @@ async function _runInstallOne(dep: { id: number, name: string, ecosystem: string
   catch (e: any) {
     logger.error(`[依赖管理] 安装 ${dep.ecosystem}/${dep.name} 失败`, e?.message ?? e)
     try {
-      await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
+      await db.dependencyManage.$updateById({ id: dep.id, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED })
     }
     catch {}
@@ -276,7 +276,7 @@ export function enqueueUninstall(deps: Array<{ id: number, name: string, ecosyst
 
 async function _runUninstallOne(dep: { id: number, name: string, ecosystem: string }) {
   try {
-    await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.UNINSTALLING, last_error: '' } })
+    await db.dependencyManage.$updateById({ id: dep.id, data: { status: DepStatus.UNINSTALLING, last_error: '' } })
     socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.UNINSTALLING })
 
     const base = getBaseName(dep.ecosystem, dep.name)
@@ -284,15 +284,15 @@ async function _runUninstallOne(dep: { id: number, name: string, ecosystem: stri
     const output = [stdout, stderr].filter(Boolean).join('\n').trim()
 
     if (code === 0) {
-      await db.dependencyManage.update({
-        where: { id: dep.id },
+      await db.dependencyManage.$updateById({
+        id: dep.id,
         data: { status: DepStatus.NOT_INSTALLED, installed_ver: '', last_error: '' },
       })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.NOT_INSTALLED, installed_ver: '' })
     }
     else {
-      await db.dependencyManage.update({
-        where: { id: dep.id },
+      await db.dependencyManage.$updateById({
+        id: dep.id,
         data: { status: DepStatus.FAILED, last_error: output.slice(0, 8000) },
       })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED, last_error: output.slice(0, 8000) })
@@ -301,7 +301,7 @@ async function _runUninstallOne(dep: { id: number, name: string, ecosystem: stri
   catch (e: any) {
     logger.error(`[依赖管理] 卸载 ${dep.ecosystem}/${dep.name} 失败`, e?.message ?? e)
     try {
-      await db.dependencyManage.update({ where: { id: dep.id }, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
+      await db.dependencyManage.$updateById({ id: dep.id, data: { status: DepStatus.FAILED, last_error: String(e?.message ?? e).slice(0, 8000) } })
       socketCommon.emit(socketEventName, { id: dep.id, status: DepStatus.FAILED })
     }
     catch { /* ignore db error in recovery */ }

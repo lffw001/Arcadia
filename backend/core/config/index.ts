@@ -108,9 +108,7 @@ export async function rotateJwtSecret(): Promise<void> {
  * 获取模块配置并转换为键值对映射
  */
 async function getModuleConfigMap(module: ConfigModule): Promise<Record<string, string>> {
-  const configs = await db.config.findMany({
-    where: { module },
-  })
+  const configs = await db.config.$list({ where: { module } })
   const defaultKeys = Object.keys(DEFAULT_CONFIG_VALUES[module])
 
   // 补充对应模块缺失的配置字段记录
@@ -212,7 +210,7 @@ export async function getFullConfig() {
  * 清理无效和重复的配置记录
  */
 async function cleanInvalidConfigs(): Promise<void> {
-  const allConfigs = await db.config.findMany()
+  const allConfigs = await db.config.$list()
   const idsToDelete: number[] = []
   const seenKeys = new Map<string, number>()
 
@@ -330,18 +328,14 @@ async function _migrateSystemConfigKeys(): Promise<void> {
   if (legacyKeys.length === 0)
     return
   // 查找所有旧的 UPPER_SNAKE_CASE 记录
-  const oldConfigs = await db.config.findMany({
-    where: { module: ConfigModule.SYSTEM, key: { in: legacyKeys } },
-  })
+  const oldConfigs = await db.config.$list({ where: { module: ConfigModule.SYSTEM, key: { in: legacyKeys } } })
   if (oldConfigs.length === 0)
     return
   // 查找对应的新 camelCase 记录
   const newKeys = oldConfigs.map(c => LEGACY_SYSTEM_KEYS[c.key]).filter(Boolean)
   const newConfigMap = new Map<string, configModel>()
   if (newKeys.length > 0) {
-    const newConfigs = await db.config.findMany({
-      where: { module: ConfigModule.SYSTEM, key: { in: newKeys } },
-    })
+    const newConfigs = await db.config.$list({ where: { module: ConfigModule.SYSTEM, key: { in: newKeys } } })
     for (const c of newConfigs)
       newConfigMap.set(c.key, c)
   }

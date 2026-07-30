@@ -202,8 +202,8 @@ export async function createToken(data?: {
     expire_time: data?.expire_time || null,
     enable: 1,
     permissions: serializePermissions(perms),
-  }) as openApiAccessKeyModel
-  tokenCache.set((record as openApiAccessKeyModel).value, record)
+  })
+  tokenCache.set(record.value, record)
   return record
 }
 
@@ -225,13 +225,13 @@ export async function updateToken(
   if (permissions !== undefined) {
     updateData.permissions = serializePermissions(permissions)
   }
-  const result = await db.openApiAccessKey.update({ where: { id }, data: updateData })
+  const result = await db.openApiAccessKey.$updateById({ id, data: updateData })
   invalidateCache(result.value)
   return result
 }
 
 export async function deleteToken(id: number) {
-  const record = await db.openApiAccessKey.findUnique({ where: { id } })
+  const record = await db.openApiAccessKey.$getById(id)
   if (record)
     invalidateCache(record.value)
   await db.openApiAccessKey.$deleteById(id)
@@ -239,7 +239,7 @@ export async function deleteToken(id: number) {
 
 export async function initTokenCache() {
   try {
-    const records = await db.openApiAccessKey.findMany({ where: { enable: 1 } })
+    const records = await db.openApiAccessKey.$list({ where: { enable: 1 } })
     for (const record of records) {
       tokenCache.set(record.value, record)
     }

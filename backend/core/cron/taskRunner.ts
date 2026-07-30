@@ -279,11 +279,11 @@ function cleanupRunningTaskState(
     // 并发场景：需要比较时间戳避免覆盖更新的运行记录
     db.tasks.$getById(task.id).then((t: tasksModel) => {
       if (!t.last_runtime || t.last_runtime.getTime() <= startTime) {
-        db.tasks.update({ where: { id: t.id }, data }).catch((_e) => {})
+        db.tasks.$updateById({ id: t.id, data }).catch((_e) => {})
       }
     }).catch((_e) => {})
   }
   else {
-    db.tasks.update({ where: { id: task.id }, data }).catch((_e) => {})
+    db.tasks.$updateById({ id: task.id, data }).catch((_e) => {})
   }
 }

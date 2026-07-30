@@ -27,19 +27,17 @@ export function isComposite(
 export async function convertToCLIExport() {
   const envsGroupResult = await db.envsGroup.$list(
     {
-      id: { not: 0 },
+      where: { id: { not: 0 } },
+      orderBy: { sort: 'asc' }, // 升序
     },
     {
-      sort: 'asc', // 升序
-    },
-    {
-      include: {
-        envs: true,
-      },
+      include: { envs: true },
     },
   )
   const envsResult = await db.envs.$list({
-    group_id: 0,
+    where: {
+      group_id: 0,
+    },
   })
   return generateEnvSh(envsGroupResult, envsResult)
 }
@@ -160,13 +158,17 @@ export async function updateItemSortById(id: number, newOrder: number) {
  */
 export async function checkVaribleExsit(name: string) {
   if (((await db.envsGroup.$list({
-    id: { not: 0 },
-    type: name,
+    where: {
+      id: { not: 0 },
+      type: name,
+    },
   })) || []).length > 0) {
     throw new Error(`已存在复合变量 ${name}`)
   }
   if (((await db.envs.$list({
-    type: name,
+    where: {
+      type: name,
+    },
   })) || []).length > 0) {
     throw new Error(`已存在普通变量 ${name}`)
   }
@@ -203,17 +205,17 @@ export function tagLabelContainsFilter(
  * 获取标签列表（去重、排序、搜索）
  */
 export async function getTagsList() {
-  const rows = await db.envsGroup.findMany({
-    where: { id: { not: 0 } },
-    select: { tag_list: true },
-  })
+  const rows = await db.envsGroup.$list(
+    { where: { id: { not: 0 } } },
+    { select: { tag_list: true } },
+  )
   return handleTagsListFilter(rows)
 }
 export async function getTagsListItem(group_id: number) {
-  const rows = await db.envs.findMany({
-    where: { group_id: { equals: group_id } },
-    select: { tag_list: true },
-  })
+  const rows = await db.envs.$list(
+    { where: { group_id: { equals: group_id } } },
+    { select: { tag_list: true } },
+  )
   return handleTagsListFilter(rows)
 }
 function handleTagsListFilter(rows: ({ tag_list: string })[]) {

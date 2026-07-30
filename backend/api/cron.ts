@@ -269,7 +269,7 @@ api.post('/', async (request, response) => {
     delete task.id
     // 校验定时规则
     validateCronExpression(task.cron)
-    const createResult = await db.tasks.$create(task) as tasksModel
+    const createResult = await db.tasks.$create(task as tasksModel)
     response.send(API_STATUS_CODE.okData(createResult))
     logger.info('添加定时任务', JSON.stringify(task))
     await fixOrder()
@@ -320,7 +320,7 @@ apiOpen.post('/v1/create', async (request, response) => {
       create_time: new Date(),
     })
     // 操作数据库
-    const createResult = await db.tasks.$create(task) as tasksModel
+    const createResult = await db.tasks.$create(task as tasksModel)
     response.send(API_STATUS_CODE.okData(createResult))
     logger.info('[OpenAPI · Cron]', '添加定时任务', JSON.stringify(task))
     await fixOrder()
@@ -365,7 +365,7 @@ api.put('/', async (request, response) => {
         throw new Error(`任务 ${task.id} 不存在`)
       }
       try {
-        const res = await db.tasks.update({ data: task, where: { id: task.id } })
+        const res = await db.tasks.$updateById({ id: task.id, data: task })
         logger.info('修改定时任务', res.name, JSON.stringify(res))
         // 定时规则变更，重新加载定时任务
         if (task && task.cron && originTask.cron !== task.cron) {
@@ -432,7 +432,7 @@ apiOpen.post('/v1/update', async (request, response) => {
       validateCronExpression(cron)
     }
     // 操作数据库
-    const res = await db.tasks.update({ data: task, where: { id } })
+    const res = await db.tasks.$updateById({ id, data: task })
     response.send(API_STATUS_CODE.okData(res))
     logger.info('[OpenAPI · Cron]', '修改定时任务', res.name, JSON.stringify(task))
     // 定时规则变更，重新加载定时任务
@@ -679,8 +679,10 @@ apiInner.post('/updateAll', async (request, response) => {
     // 删除
     if (deleteFiles && deleteFiles.length > 0) {
       const deleteTask = await db.tasks.$list({
-        type: TasksTypeEnum.SYSTEM,
-        bind: { in: deleteFiles.map((s: CodeFileResolveResult) => convertPathToBind(type, s.path)) },
+        where: {
+          type: TasksTypeEnum.SYSTEM,
+          bind: { in: deleteFiles.map((s: CodeFileResolveResult) => convertPathToBind(type, s.path)) },
+        },
       })
       const deleteIds = deleteTask.map((s) => s.id)
       await db.tasks.$deleteById(deleteIds)
@@ -716,8 +718,10 @@ apiInner.post('/updateAll', async (request, response) => {
     if (newFiles && newFiles.length > 0) {
       // 先删除已存在的防止重复添加
       const deleteTask = await db.tasks.$list({
-        type: TasksTypeEnum.SYSTEM,
-        bind: { in: newFiles.map((s: CodeFileResolveResult) => convertPathToBind(type, s.path)) },
+        where: {
+          type: TasksTypeEnum.SYSTEM,
+          bind: { in: newFiles.map((s: CodeFileResolveResult) => convertPathToBind(type, s.path)) },
+        },
       })
       const deleteIds = deleteTask.map((s) => s.id)
       await db.tasks.$deleteById(deleteIds)
@@ -739,7 +743,7 @@ apiInner.post('/updateAll', async (request, response) => {
             create_time: new Date(),
             bind: convertPathToBind(type, item.path),
           }
-          const createResult = await db.tasks.$create(data) as tasksModel
+          const createResult = await db.tasks.$create(data)
           createdIds.push(createResult.id)
           infos.push({
             success: true,

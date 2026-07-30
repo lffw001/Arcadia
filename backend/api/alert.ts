@@ -84,8 +84,8 @@ api.put('/config', async (request, response) => {
       return
     }
 
-    const updatedConfig = await db.alertConfig.update({
-      where: { id: config.id },
+    const updatedConfig = await db.alertConfig.$updateById({
+      id: config.id,
       data: config,
     })
     response.send(API_STATUS_CODE.okData(updatedConfig))
@@ -189,8 +189,8 @@ api.put('/rule', async (request, response) => {
       return
     }
 
-    const updatedRule = await db.alertConfigRule.update({
-      where: { id: rule.id },
+    const updatedRule = await db.alertConfigRule.$updateById({
+      id: rule.id,
       data: rule,
     })
     response.send(API_STATUS_CODE.okData(updatedRule))
@@ -294,8 +294,8 @@ api.put('/notify', async (request, response) => {
       return
     }
 
-    const updatedNotify = await db.alertConfigNotify.update({
-      where: { id: notify.id },
+    const updatedNotify = await db.alertConfigNotify.$updateById({
+      id: notify.id,
       data: notify,
     })
     response.send(API_STATUS_CODE.okData(updatedNotify))

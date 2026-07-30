@@ -1,4 +1,4 @@
-import type { messageModel, messageWhereInput } from '../../db'
+import type { messageWhereInput } from '../../db'
 import { createHash } from 'node:crypto'
 import { db } from '../../db'
 import { validateObject } from '../../utils'
@@ -75,7 +75,7 @@ export async function sendMessage(data: MessageData): Promise<boolean> {
     return false
 
   // 插入
-  const msg = await db.message.$create({ title, content, category, type }) as messageModel
+  const msg = await db.message.$create({ title, content, category, type })
 
   // 注册去重缓存
   registerDedup(fingerprint)

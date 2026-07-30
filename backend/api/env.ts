@@ -3,12 +3,12 @@ import express from 'express'
 import { API_STATUS_CODE } from '../utils/httpUtil'
 import { logger } from '../utils/logger'
 import type {
+  BatchPayload,
   ComboEnvsGroupWithCount,
   envsGroupModel,
   envsGroupWhereInput,
   envsModel,
   envsWhereInput,
-  GetBatchResult,
   PageResult,
 } from '../db'
 import db, { flattenEnvsGroupPageResult, flattenIncludeRelationCount } from '../db'
@@ -339,17 +339,21 @@ apiOpen.get('/v1/query', async (request, response) => {
     }
     // 查询 envs 表
     const envsResult = await db.envs.$list({
-      group_id: 0,
-      AND: queryConditions,
+      where: {
+        group_id: 0,
+        AND: queryConditions,
+      },
     }) || []
     if (envsResult.length > 0) {
       result.push(...envsResult)
     }
     // 查询 envsGroup 表
     const envsGroupResult = await db.envsGroup.$list({
-      id: { not: 0 },
-      AND: queryConditions,
-    }, undefined, { include: { _count: { select: { envs: true } } } }) || []
+      where: {
+        id: { not: 0 },
+        AND: queryConditions,
+      },
+    }, { include: { _count: { select: { envs: true } } } }) || []
     if (envsGroupResult.length > 0) {
       result.push(...flattenIncludeRelationCount(envsGroupResult))
     }
@@ -411,8 +415,10 @@ apiOpen.get('/v1/queryMember', async (request, response) => {
     }
     // 查询 envs 表
     const result = await db.envs.$list({
-      group_id: Number.parseInt(id),
-      AND: queryConditions,
+      where: {
+        group_id: Number.parseInt(id),
+        AND: queryConditions,
+      },
     }) || []
     // 返回数据
     response.send(API_STATUS_CODE.okData(result))
@@ -642,7 +648,7 @@ apiOpen.post('/v1/create', async (request, response) => {
       }
       formatData.push(obj)
     }
-    let result: envsModel | envsGroupModel | GetBatchResult
+    let result: envsModel | envsGroupModel | BatchPayload
     if (category === EnvTypes.COMPOSITE) {
       result = await db.envsGroup.$create(formatData as envsGroupModel[])
     }
@@ -723,14 +729,16 @@ apiOpen.post('/v1/update', async (request, response) => {
           throw new Error('参数 group_id 无效（参数值类型错误）')
         }
         // 检查变量是否存在
-        const envsItems = await db.envs.$list({ id: obj.id }) || []
+        const envsItems = await db.envs.$list({ where: { id: obj.id } }) || []
         if (envsItems.length <= 0) {
           throw new Error(`参数 id 无效，复合变量的值 ${obj.id} 不存在`)
         }
         // 检查复合变量(组)是否存在（仅一次）
         if (!existGroupIds.includes((obj as envsModel).group_id)) {
           if (((await db.envsGroup.$list({
-            id: (obj as envsModel).group_id,
+            where: {
+              id: (obj as envsModel).group_id,
+            },
           })) || []).length > 0) {
             existGroupIds.push(obj.id)
           }
@@ -747,7 +755,7 @@ apiOpen.post('/v1/update', async (request, response) => {
         }
         if (category === EnvTypes.ORDINARY) {
           // 检查变量是否存在
-          const envsItems = await db.envs.$list({ id: obj.id }) || []
+          const envsItems = await db.envs.$list({ where: { id: obj.id } }) || []
           if (envsItems.length <= 0) {
             throw new Error(`参数 id 无效，普通变量 ${obj.id} 不存在`)
           }
@@ -756,7 +764,7 @@ apiOpen.post('/v1/update', async (request, response) => {
         }
         else if (category === EnvTypes.COMPOSITE) {
           // 检查变量是否存在
-          const envsGroupItems = await db.envsGroup.$list({ id: obj.id }) || []
+          const envsGroupItems = await db.envsGroup.$list({ where: { id: obj.id } }) || []
           if (envsGroupItems.length <= 0) {
             throw new Error(`参数 id 无效，复合变量(组) ${obj.id} 不存在`)
           }

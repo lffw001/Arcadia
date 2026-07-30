@@ -48,7 +48,7 @@ export function registerLiveLogEvent(taskId: number) {
  * @description 从数据库中读取任务并初始化（应用数据库中配置的定时任务）
  */
 export async function initCronJob() {
-  for (const task of (await db.taskCore.findMany())) {
+  for (const task of (await db.taskCore.$list())) {
     const taskCoreId = task.id
     const tasksId = Number.parseInt(taskCoreId.substring(2))
     const cronExpression = task.cron.trim()
@@ -83,8 +83,8 @@ export async function initCronJob() {
     }
   }
   // 应用未正常设置的定时任务
-  const ids = (await db.taskCore.findMany()).map((task) => task.id.substring(2))
-  for (const task of (await db.tasks.findMany())) {
+  const ids = (await db.taskCore.$list()).map((task) => task.id.substring(2))
+  for (const task of (await db.tasks.$list())) {
     if (ids.includes(String(task.id))) {
       continue
     }

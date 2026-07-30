@@ -18,7 +18,7 @@ function getDayRange(date: Date): { start: number, end: number } {
  * 查询指定时间范围内的成功/失败计数
  */
 async function getExecCounts(start: number, end: number, taskType: TasksFilterType) {
-  const records = await db.tasksExecutionStats.findMany({
+  const records = await db.tasksExecutionStats.$list({
     where: {
       exec_timestamp: { gte: start, lte: end },
       ...(taskType !== TasksTypeEnum.ALL ? { task_type: taskType } : {}),
@@ -142,7 +142,7 @@ export async function getDashboardTrend(
     const [year, month, day] = date.split('-').map(Number)
     const { start: startTimestamp, end: endTimestamp } = getDayRange(new Date(year, month - 1, day))
 
-    const records = await db.tasksExecutionStats.findMany({
+    const records = await db.tasksExecutionStats.$list({
       where: {
         exec_timestamp: {
           gte: startTimestamp,

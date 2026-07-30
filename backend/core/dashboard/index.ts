@@ -19,7 +19,7 @@ export async function persistTaskExecution(task: Pick<tasksModel, 'id' | 'name' 
   }
 
   try {
-    await db.tasksExecutionStats.create({ data: record })
+    await db.tasksExecutionStats.$create(record)
   }
   catch (e: any) {
     logger.warn('[定时任务监控] 持久化失败', e.message || e)

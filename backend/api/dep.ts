@@ -71,13 +71,11 @@ api.post('/', async (request, response) => {
     const exists = await db.dependencyManage.findFirst({ where: { name: cleanName, ecosystem } })
     if (exists)
       throw new Error(`${cleanName} 依赖已存在`)
-    const item = await db.dependencyManage.create({
-      data: {
-        name: cleanName,
-        ecosystem,
-        remark: remark?.trim() ?? '',
-        status: DepStatus.NOT_INSTALLED,
-      },
+    const item = await db.dependencyManage.$create({
+      name: cleanName,
+      ecosystem,
+      remark: remark?.trim() ?? '',
+      status: DepStatus.NOT_INSTALLED,
     })
     response.send(API_STATUS_CODE.okData(item))
   }
@@ -101,13 +99,13 @@ api.delete('/', async (request, response) => {
     if (ids.some(v => v <= 0))
       throw new Error('参数 id 无效')
 
-    const items = await db.dependencyManage.findMany({ where: { id: { in: ids } } })
+    const items = await db.dependencyManage.$list({ where: { id: { in: ids } } })
     for (const item of items) {
       if (item.status === DepStatus.INSTALLING || item.status === DepStatus.UNINSTALLING) {
         throw new Error(`依赖 ${item.name} 正在操作中，无法删除！`)
       }
     }
-    await db.dependencyManage.deleteMany({ where: { id: { in: ids } } })
+    await db.dependencyManage.$deleteById(ids)
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
@@ -134,7 +132,7 @@ api.post('/operate', async (request, response) => {
     }
     if (!ids || ids.length === 0)
       throw new Error('ids 不能为空')
-    const items = await db.dependencyManage.findMany({ where: { id: { in: ids } } })
+    const items = await db.dependencyManage.$list({ where: { id: { in: ids } } })
     if (items.length === 0)
       throw new Error('未找到指定依赖')
     if (action === 'install') {
@@ -180,7 +178,7 @@ api.get('/error', async (request, response) => {
     if (!/^\d+$/.test(idStr))
       throw new Error('参数 id 无效')
     const id = Number.parseInt(idStr)
-    const item = await db.dependencyManage.findUnique({ where: { id } })
+    const item = await db.dependencyManage.$getById(id)
     if (!item)
       throw new Error('依赖不存在')
     response.send(API_STATUS_CODE.okData({ id: item.id, last_error: item.last_error }))
