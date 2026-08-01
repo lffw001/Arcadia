@@ -2,6 +2,8 @@ import { Prisma } from './generated/prisma/client'
 
 export interface PageResult<T> { data: T, total?: number, page: number, size: number }
 
+type PageArgs<T> = Prisma.Args<T, 'findMany'> & { page?: number | string, size?: number | string, searchCount?: boolean }
+
 // https://github.com/prisma/prisma/blob/v7/packages/client/src/runtime/core/types/exported/Result.ts#L96
 export interface BatchPayload { count: number } // GetBatchResult
 
@@ -58,142 +60,146 @@ export function withMyFunc() {
       model: {
         $allModels: {
 
-          $create<T, A extends Prisma.Args<T, 'create'> = Prisma.Args<T, 'create'>, D extends A['data'] | A['data'][] = A['data']>(
+          async $create<T, D extends Prisma.Args<T, 'create'>['data'] | Prisma.Args<T, 'create'>['data'][], O extends Omit<Prisma.Args<T, 'create'>, 'data'> | NonNullable<unknown> = NonNullable<unknown>>(
             this: T,
             data: D,
-            opts?: Omit<A, 'data'>,
-          ): Promise<D extends readonly any[] ? Prisma.Result<T, A, 'create'> | Prisma.Result<T, A, 'createMany'> : Prisma.Result<T, A, 'create'>> {
+            args?: O,
+          ): Promise<D extends readonly any[] ? Prisma.Result<T, { data: D } & O, 'create'> | BatchPayload : Prisma.Result<T, { data: D } & O, 'create'>> {
+            const context = Prisma.getExtensionContext(this)
             if (typeof data !== 'string' && Array.isArray(data)) {
-              if (data.length === 1) {
-                data = data[0]
+              if (data.length > 1) {
+                return await (context as any).createMany(args ? { data, ...args } : { data })
               }
-              else {
-                const args = opts ? { data, ...opts } : { data }
-                return (this as any).createMany(args)
-              }
+              data = data[0]
             }
-            const args = opts ? { data, ...opts } : { data }
-            return (this as any).create(args)
+            return await (context as any).create(args ? { data, ...args } : { data })
           },
 
-          $updateById<T, A extends Prisma.Args<T, 'update'> = Prisma.Args<T, 'update'>, R = Prisma.Result<T, A, 'update'>>(
+          async $updateById<T, O extends Omit<Prisma.Args<T, 'update'>, 'where' | 'data'> | NonNullable<unknown> = NonNullable<unknown>>(
             this: T,
-            input: { id: number | string, data: A['data'] },
+            input: { id: number | string, data: Prisma.Args<T, 'update'>['data'] },
             idName: string = 'id',
-            options: Partial<Omit<A, 'where' | 'data'>> = {},
-          ): Promise<R> {
+            args?: O,
+          ): Promise<Prisma.Result<T, O, 'update'>> {
+            const context = Prisma.getExtensionContext(this)
             const { id, data } = input
 
-            const cleanedId = cleanId(this, id, idName)
+            const cleanedId = cleanId(context, id, idName)
 
             if (cleanedId === undefined || cleanedId === null || cleanedId === '') {
               throw new Error(`${idName} 不能为空`)
             }
 
-            const cleanedData = clean(this, data)
+            const cleanedData = clean(context, data)
 
-            return (this as any).update({
+            return await (context as any).update({
               where: { [idName]: cleanedId },
               data: cleanedData,
-              ...options,
-            }) as Promise<R>
+              ...args,
+            })
           },
 
-          $upsertById<T, A extends Prisma.Args<T, 'upsert'> = Prisma.Args<T, 'upsert'>, R = Prisma.Result<T, A, 'upsert'>>(
+          async $upsertById<T, O extends Omit<Prisma.Args<T, 'upsert'>, 'where' | 'create' | 'update'> | NonNullable<unknown> = NonNullable<unknown>>(
             this: T,
-            data: A['create'],
+            data: Prisma.Args<T, 'upsert'>['create'],
             idName: string = 'id',
-            options?: A,
-          ): Promise<R> {
+            args?: O,
+          ): Promise<Prisma.Result<T, O, 'upsert'>> {
+            const context = Prisma.getExtensionContext(this)
             const idValue = (data as any)[idName]
-            const cleanedId = cleanId(this, idValue, idName)
+            const cleanedId = cleanId(context, idValue, idName)
 
-            const cleanedData = clean(this, data)
+            const cleanedData = clean(context, data)
             // 没有id时一定为新增
             if (cleanedId === undefined || cleanedId === null || cleanedId === '') {
-              return (this as any).create({
+              return await (context as any).create({
                 data: cleanedData,
-                ...cleanArgs(options, ['where', 'create', 'update']),
+                ...cleanArgs(args, ['where', 'create', 'update']),
               })
             }
             // 存在id使用默认的upsert逻辑
-            return (this as any).upsert({
+            return await (context as any).upsert({
               where: { [idName]: cleanedId },
               create: cleanedData,
               update: cleanedData,
-              ...cleanArgs(options, ['where', 'create', 'update']),
+              ...cleanArgs(args, ['where', 'create', 'update']),
             })
           },
 
-          $list<T, A extends Prisma.Args<T, 'findMany'> = Prisma.Args<T, 'findMany'>, R = Prisma.Result<T, A, 'findMany'>>(
+          async $list<T, A = Prisma.Args<T, 'findMany'>>(
             this: T,
             query?: Omit<Prisma.Args<T, 'findMany'>, 'select' | 'include' | 'omit'>,
-            options?: A,
-          ): Promise<R> {
-            return (this as any).findMany({
-              ...cleanArgs(options, ['where', 'orderBy']),
+            args?: Prisma.Exact<A, Prisma.Args<T, 'findMany'>>,
+          ): Promise<Prisma.Result<T, A, 'findMany'>> {
+            const context = Prisma.getExtensionContext(this)
+            return await (context as any).findMany({
+              ...cleanArgs(args, ['where', 'orderBy']),
               ...query,
-              where: clean(this, query?.where),
+              where: clean(context, query?.where),
             })
           },
 
-          $getById<T, O extends Prisma.Args<T, 'findUnique'> | NonNullable<unknown> = NonNullable<unknown>, R = Prisma.Result<T, O, 'findUnique'> | null>(
+          async $getById<T, O extends Prisma.Args<T, 'findUnique'> | NonNullable<unknown> = NonNullable<unknown>>(
             this: T,
             id: number | string,
             idName: string = 'id',
-            options?: O,
-          ): Promise<R> {
-            const cleanedId = cleanId(this, id, idName)
+            args?: O,
+          ): Promise<Prisma.Result<T, O, 'findUnique'> | null> {
+            const context = Prisma.getExtensionContext(this)
+            const cleanedId = cleanId(context, id, idName)
 
             if (cleanedId === undefined || cleanedId === null || cleanedId === '') {
-              return Promise.resolve(null) as Promise<R>
+              return null
             }
 
-            return (this as any).findUnique({
+            return await (context as any).findUnique({
               where: { [idName]: cleanedId },
-              ...(cleanArgs(options, ['where'])),
-            }) as Promise<R>
+              ...(cleanArgs(args, ['where'])),
+            })
           },
 
-          $deleteById<T, DA extends Prisma.Args<T, 'delete'> = Prisma.Args<T, 'delete'>, I extends number | string | (number | string)[] = number | string>(
+          async $deleteById<T, I extends number | string | (number | string)[] = number | string, O extends Omit<Prisma.Args<T, 'delete'>, 'where'> | NonNullable<unknown> = NonNullable<unknown>>(
             this: T,
             id: I,
             idName: string = 'id',
-            options: Partial<Omit<DA, 'where'>> = {},
-          ): Promise<I extends readonly any[] ? Prisma.Result<T, DA, 'deleteMany'> : Prisma.Result<T, DA, 'delete'>> {
+            args?: O,
+          ): Promise<I extends readonly any[] ? BatchPayload : Prisma.Result<T, O, 'delete'>> {
+            const context = Prisma.getExtensionContext(this)
             if (typeof id !== 'string' && Array.isArray(id)) {
               if (id.length === 0) {
                 throw new Error(`${idName} 数组不能为空`)
               }
 
-              return (this as any).deleteMany({
+              return await (context as any).deleteMany({
                 where: {
                   [idName]: {
-                    in: id.map(item => cleanId(this, item, idName)),
+                    in: id.map(item => cleanId(context, item, idName)),
                   },
                 },
-                ...options,
+                ...args,
               })
             }
 
-            const cleanedId = cleanId(this, id, idName)
+            const cleanedId = cleanId(context, id, idName)
 
             if (cleanedId === undefined || cleanedId === null || cleanedId === '') {
               throw new Error(`${idName} 不能为空`)
             }
 
-            return (this as any).delete({
+            return await (context as any).delete({
               where: { [idName]: cleanedId },
-              ...options,
+              ...args,
             })
           },
 
-          async $page<T, A extends Prisma.Args<T, 'findMany'> = Prisma.Args<T, 'findMany'>, D = Prisma.Result<T, A, 'findMany'>>(
+          async $page<T, A>(
             this: T,
-            args: A & { page?: number | string, size?: number | string, searchCount?: boolean },
-          ): Promise<PageResult<D>> {
-            const size = Number(args.size || 20)
-            const page = Number(args.page || 1)
+            args: Prisma.Exact<A, PageArgs<T>>,
+          ): Promise<PageResult<Prisma.Result<T, A, 'findMany'>>> {
+            const context = Prisma.getExtensionContext(this)
+            const pageArgs = args as PageArgs<T>
+            const size = Number(pageArgs.size || 20)
+            const page = Number(pageArgs.page || 1)
             if (!Number.isSafeInteger(size) || size < 1) {
               throw new Error('size 必须大于0且为整数')
             }
@@ -201,20 +207,20 @@ export function withMyFunc() {
               throw new Error('page 必须大于0且为整数')
             }
             // 清理查询条件
-            const cleanedWhere = clean(this, args.where)
+            const cleanedWhere = clean(context, pageArgs.where)
             // 剔除无关参数
-            const { page: _page, size: _size, searchCount, ...restArgs } = cleanArgs(args, ['where'])
+            const { page: _page, size: _size, searchCount, ...restArgs } = cleanArgs(pageArgs, ['where'])
             // 获取数据和总数
             const p = [
-              (this as any).findMany({
+              (context as any).findMany({
                 ...restArgs,
                 where: cleanedWhere,
                 skip: (page - 1) * size,
                 take: size,
               }),
             ]
-            if (args.searchCount !== false) {
-              p.push((this as any).count({ where: cleanedWhere }))
+            if (pageArgs.searchCount !== false) {
+              p.push((context as any).count({ where: cleanedWhere }))
             }
             const res = await Promise.all(p)
             return {
