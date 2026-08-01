@@ -118,7 +118,10 @@ export async function runCronTask(taskId: number, manual: boolean = false) {
     const task = await db.tasks.$getById(taskId)
     // 删除不存在的定时任务
     if (!task) {
-      await db.taskCore.$deleteById(`T_${taskId}`)
+      try {
+        await db.taskCore.$deleteById(`T_${taskId}`)
+      }
+      catch {}
       return
     }
     // logger.info('触发定时任务', task.shell)

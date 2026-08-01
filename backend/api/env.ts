@@ -774,11 +774,12 @@ apiOpen.post('/v1/update', async (request, response) => {
     }
     const result: (envsModel | envsGroupModel)[] = []
     for (const item of formatData) {
+      const { id, ...updateData } = item
       if (isComposite(item, category === EnvTypes.COMPOSITE)) {
-        result.push(await db.envsGroup.$upsertById(item))
+        result.push(await db.envsGroup.$updateById({ id, data: updateData }))
       }
       else {
-        result.push(await db.envs.$upsertById(item))
+        result.push(await db.envs.$updateById({ id, data: updateData }))
       }
     }
     response.send(API_STATUS_CODE.okData(result))
@@ -805,8 +806,7 @@ api.put('/changeStatus', async (request, response) => {
       if (!record) {
         throw new Error('变量不存在')
       }
-      record.enable = status
-      await db.envsGroup.$upsertById(record)
+      await db.envsGroup.$updateById({ id, data: { enable: status } })
     }
     response.send(API_STATUS_CODE.ok())
     await onChange(false)
@@ -831,8 +831,7 @@ api.put('/changeStatusItem', async (request, response) => {
       if (!record) {
         throw new Error('变量不存在')
       }
-      record.enable = status
-      await db.envs.$upsertById(record)
+      await db.envs.$updateById({ id, data: { enable: status } })
     }
     response.send(API_STATUS_CODE.ok())
     await onChange(true)
@@ -872,10 +871,10 @@ apiOpen.post('/v1/changeStatus', async (request, response) => {
       }
       record.enable = status
       if (isComposite) {
-        await db.envsGroup.$upsertById(record as envsGroupModel)
+        await db.envsGroup.$updateById({ id, data: { enable: status } })
       }
       else {
-        await db.envs.$upsertById(record as envsModel)
+        await db.envs.$updateById({ id, data: { enable: status } })
       }
       logger.info('[OpenAPI · Env]', '更改环境变量状态', id, status === 1 ? '启用' : '禁用', record)
     }

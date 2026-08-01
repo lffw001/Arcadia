@@ -20,29 +20,9 @@ import {
   updateDaemonCron,
 } from '../core/daemon'
 import db from '../db'
-import { cleanProperties, validateRequestParams } from '../utils'
+import { validateRequestParams } from '../utils'
 
 export const API: Express = express()
-
-const DAEMON_TASK_FIELDS = [
-  'name',
-  'file_path',
-  'description',
-  'boot_start',
-  'max_restarts',
-  'restart_delay',
-  'restart_cron',
-  'autorestart',
-  'max_memory_restart',
-  'stop_exit_codes',
-  'exp_backoff_restart_delay',
-  'envs',
-  'options',
-  'log_dir',
-  'log_name',
-  'log_max_lines',
-  'active',
-]
 
 /**
  * 获取守护任务列表（附带 PM2 实时状态）
@@ -74,8 +54,6 @@ API.get('/', async (_request: Request, response: Response) => {
 
 /**
  * 保存守护任务（创建或更新）
- * - 不传 id：创建
- * - 传 id：更新
  */
 API.post('/save', async (request: Request, response: Response) => {
   try {
@@ -100,12 +78,12 @@ API.post('/save', async (request: Request, response: Response) => {
         ['log_max_lines', [false, 'number']],
         ['active', [false, 'number']],
       ] as const,
-    })
+    }, true)
 
-    const { id } = params.body
-    const data = cleanProperties(params.body, DAEMON_TASK_FIELDS)
+    const { id, ...bodyParams } = params.body
+    const data = bodyParams
 
-    if (id) {
+    if (id && typeof id === 'number') {
       // 更新
       const existing = await db.daemonTask.$getById(id)
       if (!existing) {
@@ -178,9 +156,7 @@ API.post('/save', async (request: Request, response: Response) => {
         }
       }
 
-      // id 已由 cleanProperties 排除，name 和 file_path 已在上方校验
-      const { id: _id, ...createData } = data as Record<string, unknown>
-      const record = await db.daemonTask.$create(createData as daemonTaskModel)
+      const record = await db.daemonTask.$create(data as daemonTaskModel)
 
       if (record.restart_cron && record.active === 1) {
         updateDaemonCron(record.id, record.restart_cron)

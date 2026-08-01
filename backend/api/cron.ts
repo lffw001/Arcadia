@@ -29,19 +29,11 @@ import {
 } from '../utils'
 import { getDashboardRunning, getDashboardStats, getDashboardTrend } from '../core/cron/query'
 import { isValidTasksFilterType, TasksTypeEnum } from '../core/type/cron'
-import type { TasksType } from '../core/type/cron'
+import type { TaskConfigModel, TasksType } from '../core/type/cron'
 
 const api: Express = express()
 const apiOpen: Express = express()
 const apiInner: Express = express()
-
-interface TaskConfig {
-  before_task_shell: string
-  after_task_shell: string
-  log_directory: string
-  source_file: string
-  allow_concurrency: boolean
-}
 
 interface InnerOpreateResult {
   success: boolean
@@ -50,6 +42,24 @@ interface InnerOpreateResult {
   name: string
   remark: string
   message: string
+}
+
+type TaskPayload<T> = Omit<T, 'config'> & { config?: string }
+
+type CreateTaskPayload<T> = TaskPayload<T> & { type: TasksTypeEnum, create_time: Date }
+
+function handleSaveTaskConfig(config: TaskConfigModel): string {
+  const cronConfigValidateRules: ValidateObjectParamType[] = [
+    ['before_task_shell', [false, 'string']],
+    ['after_task_shell', [false, 'string']],
+    ['log_directory', [false, 'string']],
+    ['source_file', [false, 'string']],
+    ['allow_concurrency', [false, 'boolean']],
+  ]
+
+  validateObject(config, cronConfigValidateRules, 'config')
+  const conf = cleanProperties(config, cronConfigValidateRules.map((rule) => rule[0]))
+  return Object.keys(conf).length === 0 ? '' : JSON.stringify(conf) // 转为字符串（空配置对象存储为空字符串）
 }
 
 /**
@@ -295,34 +305,22 @@ apiOpen.post('/v1/create', async (request, response) => {
         ['config', [false, 'object']],
         ['error_notify', [false, [1, 0]]],
       ] as const,
-    })
+    }, true)
     const { cron } = params.body
-    const task = cleanProperties(Object.assign({}, request.body), ['name', 'cron', 'shell', 'active', 'remark', 'config', 'error_notify'])
-    // 校验高级配置
-    if (task.config) {
-      let config: TaskConfig = task.config
-      const configValidateRules: ValidateObjectParamType[] = [
-        ['before_task_shell', [false, 'string']],
-        ['after_task_shell', [false, 'string']],
-        ['log_directory', [false, 'string']],
-        ['source_file', [false, 'string']],
-        ['allow_concurrency', [false, 'boolean']],
-      ]
-      validateObject(config, configValidateRules, 'config')
-      config = cleanProperties(config, configValidateRules.map((rule) => rule[0]))
-      task.config = Object.keys(config).length === 0 ? '' : JSON.stringify(config) // 转为字符串
-    }
-    // 校验定时规则
-    validateCronExpression(cron)
-    // 补齐参数
-    Object.assign(task, {
+    const data = Object.assign({}, params.body, {
+      // 补齐参数
       type: TasksTypeEnum.USER, // 只允许创建用户任务
       create_time: new Date(),
     })
-    // 操作数据库
-    const createResult = await db.tasks.$create(task as tasksModel)
+    // 校验定时规则
+    validateCronExpression(cron)
+    // 校验高级配置
+    if (data.config) {
+      data.config = handleSaveTaskConfig(data.config)
+    }
+    const createResult = await db.tasks.$create(data as CreateTaskPayload<typeof params.body>)
     response.send(API_STATUS_CODE.okData(createResult))
-    logger.info('[OpenAPI · Cron]', '添加定时任务', JSON.stringify(task))
+    logger.info('[OpenAPI · Cron]', '添加定时任务', JSON.stringify(data))
     await fixOrder()
     if (createResult?.id) {
       await applyCron(createResult.id)
@@ -403,7 +401,7 @@ apiOpen.post('/v1/update', async (request, response) => {
         ['config', [false, 'object']],
         ['error_notify', [false, [1, 0]]],
       ] as const,
-    })
+    }, true)
     const { id, cron } = params.body
     if (id <= 0) {
       throw new Error('参数 id 无效（参数值类型错误）')
@@ -412,29 +410,19 @@ apiOpen.post('/v1/update', async (request, response) => {
     if (!record) {
       throw new Error('任务不存在')
     }
-    const task = cleanProperties(Object.assign({}, request.body), ['id', 'name', 'cron', 'shell', 'type', 'active', 'remark', 'config', 'error_notify'])
-    // 校验高级配置
-    if (task.config) {
-      let config: TaskConfig = task.config
-      const configValidateRules: ValidateObjectParamType[] = [
-        ['before_task_shell', [false, 'string']],
-        ['after_task_shell', [false, 'string']],
-        ['log_directory', [false, 'string']],
-        ['source_file', [false, 'string']],
-        ['allow_concurrency', [false, 'boolean']],
-      ]
-      validateObject(config, configValidateRules, 'config')
-      config = cleanProperties(config, configValidateRules.map((rule) => rule[0]))
-      task.config = Object.keys(config).length === 0 ? '' : JSON.stringify(config) // 转为字符串
-    }
+    const data = Object.assign({}, params.body)
     // 校验定时规则
     if (cron) {
       validateCronExpression(cron)
     }
+    // 校验高级配置
+    if (data.config) {
+      data.config = handleSaveTaskConfig(data.config)
+    }
     // 操作数据库
-    const res = await db.tasks.$updateById({ id, data: task })
+    const res = await db.tasks.$updateById({ id, data: data as TaskPayload<typeof params.body> })
     response.send(API_STATUS_CODE.okData(res))
-    logger.info('[OpenAPI · Cron]', '修改定时任务', res.name, JSON.stringify(task))
+    logger.info('[OpenAPI · Cron]', '修改定时任务', res.name, JSON.stringify(data))
     // 定时规则变更，重新加载定时任务
     if (record.cron !== cron) {
       await applyCron(id)

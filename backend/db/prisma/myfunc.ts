@@ -2,8 +2,8 @@ import { Prisma } from './generated/prisma/client'
 
 export interface PageResult<T> { data: T, total?: number, page: number, size: number }
 
-// https://github.com/prisma/prisma/blob/main/packages/client/src/runtime/core/types/exported/Result.ts#L96
-export interface BatchPayload { count: number }
+// https://github.com/prisma/prisma/blob/v7/packages/client/src/runtime/core/types/exported/Result.ts#L96
+export interface BatchPayload { count: number } // GetBatchResult
 
 export function clean(model: any, o: any): any {
   if (!o)
@@ -34,15 +34,17 @@ export function cleanArgs(data: any, keys: string[]) {
   return res
 }
 
-export function cleanId(model: any, value: any, fieldName: string): string | number {
+export function cleanId(model: any, value: any, fieldName: string): string | number | undefined {
   if (value === undefined || value === null)
     return value
   const field = model.fields?.[fieldName]
   if (!field)
     return value
   switch (field.typeName) {
-    case 'Int':
-      return Number(value)
+    case 'Int': {
+      const num = Number(value)
+      return Number.isNaN(num) ? undefined : num
+    }
     case 'String':
       return String(value)
     default:
@@ -60,7 +62,7 @@ export function withMyFunc() {
             this: T,
             data: D,
             opts?: Omit<A, 'data'>,
-          ): Promise<D extends readonly any[] ? Prisma.Result<T, A, 'create'> | BatchPayload : Prisma.Result<T, A, 'create'>> {
+          ): Promise<D extends readonly any[] ? Prisma.Result<T, A, 'create'> | Prisma.Result<T, A, 'createMany'> : Prisma.Result<T, A, 'create'>> {
             if (typeof data !== 'string' && Array.isArray(data)) {
               if (data.length === 1) {
                 data = data[0]
@@ -111,7 +113,7 @@ export function withMyFunc() {
             if (cleanedId === undefined || cleanedId === null || cleanedId === '') {
               return (this as any).create({
                 data: cleanedData,
-                ...options,
+                ...cleanArgs(options, ['where', 'create', 'update']),
               })
             }
             // 存在id使用默认的upsert逻辑
@@ -135,11 +137,11 @@ export function withMyFunc() {
             })
           },
 
-          $getById<T, A extends Prisma.Args<T, 'findFirst'> = Prisma.Args<T, 'findFirst'>, R = Prisma.Result<T, A, 'findFirst'> | null>(
+          $getById<T, O extends Prisma.Args<T, 'findUnique'> | NonNullable<unknown> = NonNullable<unknown>, R = Prisma.Result<T, O, 'findUnique'> | null>(
             this: T,
             id: number | string,
             idName: string = 'id',
-            options?: A,
+            options?: O,
           ): Promise<R> {
             const cleanedId = cleanId(this, id, idName)
 
@@ -147,52 +149,43 @@ export function withMyFunc() {
               return Promise.resolve(null) as Promise<R>
             }
 
-            return (this as any).findFirst({
+            return (this as any).findUnique({
               where: { [idName]: cleanedId },
               ...(cleanArgs(options, ['where'])),
             }) as Promise<R>
           },
 
-          $deleteById<T, DA extends Prisma.Args<T, 'delete'> = Prisma.Args<T, 'delete'>, DMA extends Prisma.Args<T, 'deleteMany'> = Prisma.Args<T, 'deleteMany'>, DR = Prisma.Result<T, DA, 'delete'>, DMR = Prisma.Result<T, DMA, 'deleteMany'>>(
+          $deleteById<T, DA extends Prisma.Args<T, 'delete'> = Prisma.Args<T, 'delete'>, I extends number | string | (number | string)[] = number | string>(
             this: T,
-            id: number | string | (number | string)[],
+            id: I,
             idName: string = 'id',
-            options: Partial<Omit<DA | DMA, 'where'>> = {} as any,
-          ): Promise<DR | DMR | boolean> {
-            try {
-              if (typeof id !== 'string' && Array.isArray(id)) {
-                if (id.length === 0) {
-                  return Promise.resolve(false) as Promise<any>
-                }
+            options: Partial<Omit<DA, 'where'>> = {},
+          ): Promise<I extends readonly any[] ? Prisma.Result<T, DA, 'deleteMany'> : Prisma.Result<T, DA, 'delete'>> {
+            if (typeof id !== 'string' && Array.isArray(id)) {
+              if (id.length === 0) {
+                throw new Error(`${idName} 数组不能为空`)
+              }
 
-                return (this as any).deleteMany({
-                  where: {
-                    [idName]: {
-                      in: id.map(item => cleanId(this, item, idName)),
-                    },
+              return (this as any).deleteMany({
+                where: {
+                  [idName]: {
+                    in: id.map(item => cleanId(this, item, idName)),
                   },
-                  ...options,
-                })
-              }
-
-              const cleanedId = cleanId(this, id, idName)
-
-              if (cleanedId === undefined || cleanedId === null || cleanedId === '') {
-                return Promise.resolve(false) as Promise<any>
-              }
-
-              return (this as any).delete({
-                where: { [idName]: cleanedId },
+                },
                 ...options,
               })
             }
-            catch (e: any) {
-              // P2025: Record to delete does not exist
-              if (e.code === 'P2025') {
-                return Promise.resolve(false) as Promise<any>
-              }
-              throw e
+
+            const cleanedId = cleanId(this, id, idName)
+
+            if (cleanedId === undefined || cleanedId === null || cleanedId === '') {
+              throw new Error(`${idName} 不能为空`)
             }
+
+            return (this as any).delete({
+              where: { [idName]: cleanedId },
+              ...options,
+            })
           },
 
           async $page<T, A extends Prisma.Args<T, 'findMany'> = Prisma.Args<T, 'findMany'>, D = Prisma.Result<T, A, 'findMany'>>(
