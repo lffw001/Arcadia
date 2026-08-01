@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { validateCronExpression } from '../core/cron/engine'
-import type { daemonTaskModel } from '../db'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { validateCronExpression } from '../../core/cron/engine'
+import type { daemonTaskModel } from '../../db'
 import {
   checkNameAvailable,
   deleteDaemonTask,
@@ -18,9 +18,9 @@ import {
   stopDaemonTask,
   trimDaemonTaskLog,
   updateDaemonCron,
-} from '../core/daemon'
-import db from '../db'
-import { validateRequestParams } from '../utils'
+} from '../../core/daemon'
+import db from '../../db'
+import { validateRequestParams } from '../../utils'
 
 export const API: Express = express()
 

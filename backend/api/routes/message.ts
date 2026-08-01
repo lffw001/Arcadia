@@ -1,11 +1,11 @@
 import type { Express, Request } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import type { messageWhereInput } from '../db'
-import db from '../db'
-import { validatePageFixedParams, validateRequestParams } from '../utils'
-import { getUnreadCount, pushUserMessage } from '../core/message'
-import { handleOpenApiError } from './openApi'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import type { messageWhereInput } from '../../db'
+import db from '../../db'
+import { validatePageFixedParams, validateRequestParams } from '../../utils'
+import { getUnreadCount, pushUserMessage } from '../../core/message'
+import { handleOpenApiError } from '../openapi/openApiCore'
 
 const api: Express = express()
 const apiOpen: Express = express()

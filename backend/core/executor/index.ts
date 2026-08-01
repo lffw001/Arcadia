@@ -1,5 +1,5 @@
 import { exec, execFile } from 'node:child_process'
-import { getNeatContent } from '../../server/fileCore'
+import { getNeatContent } from '../file'
 import { socketCommon } from '../../server/socketCommon'
 import { randomString } from '../../utils'
 import { API_STATUS_CODE } from '../../utils/httpUtil'

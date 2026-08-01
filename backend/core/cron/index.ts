@@ -3,7 +3,7 @@ import db from '../../db'
 import type { TaskInstance } from './type'
 import { logger } from '../../utils/logger'
 import { getLatestRunningInstance, liveLogRegistered, runCronTask } from './taskRunner'
-import { makeSocketRunCallbacks } from '../runner'
+import { makeSocketRunCallbacks } from '../executor'
 import { registerCleanupCron } from './cleanup'
 
 export { getAllRunningInstances, isTaskRunning, runCronTask, stopCronTask } from './taskRunner'

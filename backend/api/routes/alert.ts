@@ -1,8 +1,8 @@
 import type { Express } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import db from '../db'
-import { validateRequestParams } from '../utils'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import db from '../../db'
+import { validateRequestParams } from '../../utils'
 
 const api: Express = express()
 

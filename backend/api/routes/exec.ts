@@ -1,22 +1,22 @@
 import type { Express, Request, Response } from 'express'
 import express from 'express'
 import { execFile } from 'node:child_process'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { randomString, validateObject, validateRequestParams } from '../utils'
-import { validateEnvName } from '../utils/envUtil'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { randomString, validateObject, validateRequestParams } from '../../utils'
+import { validateEnvName } from '../../utils/envUtil'
 import {
   checkPathAccess,
   checkPathBoundary,
   cleanDebugTempFile,
   createDebugTempFile,
   getNeatContent,
-} from '../server/fileCore'
-import { APP_ROOT_DIR } from '../core/type'
-import { CLI_CMD } from '../core/type/cli'
-import { buildRunCodeFileCmd, makeNoopRunCallbacks, makeSocketRunCallbacks, runCodeFile, runningExecTasks, runShellCmd } from '../core/runner'
-import type { RunEnv, RunOption } from '../core/runner'
+} from '../../core/file'
+import { APP_ROOT_DIR } from '../../core/type'
+import { CLI_CMD } from '../../core/type/cli'
+import { buildRunCodeFileCmd, makeNoopRunCallbacks, makeSocketRunCallbacks, runCodeFile, runningExecTasks, runShellCmd } from '../../core/executor'
+import type { RunEnv, RunOption } from '../../core/executor'
 import { createSession } from 'better-sse'
-import { handleOpenApiError } from './openApi'
+import { handleOpenApiError } from '../openapi/openApiCore'
 
 const api: Express = express()
 const apiOpen: Express = express()

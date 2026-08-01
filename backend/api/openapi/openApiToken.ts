@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { ALL_PERMISSION_KEYS, createToken, deleteToken, listTokens, updateToken } from './openApi'
-import type { PermissionKey } from './openApi'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { ALL_PERMISSION_KEYS, createToken, deleteToken, listTokens, updateToken } from './openApiCore'
+import type { PermissionKey } from './openApiCore'
 
 const api: Express = express()
 
@@ -91,15 +91,6 @@ api.delete('/', async (request: Request, response: Response) => {
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || '删除失败'))
   }
-})
-
-export const systemApi: Express = express()
-
-/**
- * 健康检测
- */
-systemApi.get('/health', async (_request, response) => {
-  response.send(API_STATUS_CODE.okData(true))
 })
 
 export const API = api

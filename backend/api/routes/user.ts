@@ -1,11 +1,11 @@
 import type { Express, Request } from 'express'
 import express from 'express'
-import { API_STATUS_CODE, getClientIP, ip2AddressCached, parseUserAgent } from '../utils/httpUtil'
-import { logger } from '../utils/logger'
+import { API_STATUS_CODE, getClientIP, ip2AddressCached, parseUserAgent } from '../../utils/httpUtil'
+import { logger } from '../../utils/logger'
 import jwt from 'jsonwebtoken'
-import { randomString } from '../utils'
-import { getRuntimeConfigValue, getUserModuleConfig, rotateJwtSecret, updateUserConfigValue } from '../core/config'
-import { hashPassword, resetUserCredentials, saveUserCredentials, verifyPassword } from '../core/config/user'
+import { randomString } from '../../utils'
+import { getRuntimeConfigValue, getUserModuleConfig, rotateJwtSecret, updateUserConfigValue } from '../../core/config'
+import { hashPassword, resetUserCredentials, saveUserCredentials, verifyPassword } from '../../core/config/user'
 import {
   disableTOTP,
   enableTOTP,
@@ -14,8 +14,8 @@ import {
   isTOTPEnabled,
   saveTOTPSecret,
   verifyTOTPCode,
-} from '../core/config/totp'
-import { ConfigKeyRuntime, ConfigKeyUser, DEFAULT_USER_CONFIG_VALUES } from '../core/type/config'
+} from '../../core/config/totp'
+import { ConfigKeyRuntime, ConfigKeyUser, DEFAULT_USER_CONFIG_VALUES } from '../../core/type/config'
 import {
   getAuthErrorCount,
   getAuthLimitRemainingTime,
@@ -24,8 +24,8 @@ import {
   isAuthLimited,
   resetAuthError,
   shouldShowCaptcha,
-} from '../core/config/session'
-import { addLoginLog, getLastLoginInfo } from '../core/log'
+} from '../../core/config/session'
+import { addLoginLog, getLastLoginInfo } from '../../core/log'
 
 const api: Express = express()
 const apiInner: Express = express()

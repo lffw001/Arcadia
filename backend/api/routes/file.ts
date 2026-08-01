@@ -1,7 +1,7 @@
 import type { Express, Request as ExpressRequest } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { logger } from '../utils/logger'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { logger } from '../../utils/logger'
 import fs from 'node:fs'
 import { Buffer } from 'node:buffer'
 import multer from 'multer'
@@ -10,7 +10,7 @@ import type {
   FileTreeParams,
   SearchFileTreeParams,
   SearchLogFileTreeParams,
-} from '../server/fileCore'
+} from '../../core/file'
 import {
   checkPathAccess,
   checkPathBoundary,
@@ -26,10 +26,10 @@ import {
   saveFile,
   searchFileTree,
   searchLogFileTree,
-} from '../server/fileCore'
-import { APP_DIR_PATH, APP_DIR_TYPE, APP_ROOT_DIR } from '../core/type'
-import { validateRequestParams } from '../utils'
-import { handleOpenApiError } from './openApi'
+} from '../../core/file'
+import { APP_DIR_PATH, APP_DIR_TYPE, APP_ROOT_DIR } from '../../core/type'
+import { validateRequestParams } from '../../utils'
+import { handleOpenApiError } from '../openapi/openApiCore'
 
 const api: Express = express()
 const apiOpen: Express = express()

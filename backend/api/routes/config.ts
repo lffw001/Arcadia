@@ -1,12 +1,12 @@
 import type { Express, Request, Response } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { validateRequestParams } from '../utils'
-import { getCliModuleConfig, getSystemModuleConfig, updateConfigValue } from '../core/config'
-import { ConfigKeyCli, ConfigKeySystem, ConfigModule } from '../core/type/config'
-import { generateCliConfigSh } from '../core/config/cli'
-import { applySystemTimezone, depSetSource } from '../core/config/system'
-import { registerCleanupCron } from '../core/cron/cleanup'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { validateRequestParams } from '../../utils'
+import { getCliModuleConfig, getSystemModuleConfig, updateConfigValue } from '../../core/config'
+import { ConfigKeyCli, ConfigKeySystem, ConfigModule } from '../../core/type/config'
+import { generateCliConfigSh } from '../../core/config/cli'
+import { applySystemTimezone, depSetSource } from '../../core/config/system'
+import { registerCleanupCron } from '../../core/cron/cleanup'
 
 export const API: Express = express()
 

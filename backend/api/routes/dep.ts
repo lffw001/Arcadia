@@ -1,10 +1,10 @@
 import type { Express } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import type { dependencyManageWhereInput } from '../db'
-import db from '../db'
-import { validateRequestParams } from '../utils'
-import { DepStatus, ECOSYSTEMS, enqueueInstall, enqueueUninstall, getBaseName, PROTECTED, syncDeps } from '../core/dep'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import type { dependencyManageWhereInput } from '../../db'
+import db from '../../db'
+import { validateRequestParams } from '../../utils'
+import { DepStatus, ECOSYSTEMS, enqueueInstall, enqueueUninstall, getBaseName, PROTECTED, syncDeps } from '../../core/dep'
 
 const api: Express = express()
 

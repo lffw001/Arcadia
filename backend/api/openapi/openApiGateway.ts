@@ -1,10 +1,10 @@
 import type { Express, Request, RequestHandler } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { logger } from '../utils/logger'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { logger } from '../../utils/logger'
 import fs from 'node:fs'
-import { APP_FILE_PATH } from '../core/type'
-import { hasPermission, openApiLogMiddleware, resolveRoutePermission, verifyToken } from './openApi'
+import { APP_FILE_PATH } from '../../core/type'
+import { hasPermission, openApiLogMiddleware, resolveRoutePermission, verifyToken } from './openApiCore'
 
 const api: Express = express()
 

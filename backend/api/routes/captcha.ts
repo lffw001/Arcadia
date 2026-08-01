@@ -2,8 +2,8 @@ import type { Express } from 'express'
 import { Buffer } from 'node:buffer'
 import express from 'express'
 import { generateCaptcha } from 'lemon-captcha'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { setCaptcha, shouldShowCaptcha } from '../core/config/session'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { setCaptcha, shouldShowCaptcha } from '../../core/config/session'
 
 const api: Express = express()
 

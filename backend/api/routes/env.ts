@@ -1,7 +1,7 @@
 import type { Express } from 'express'
 import express from 'express'
-import { API_STATUS_CODE } from '../utils/httpUtil'
-import { logger } from '../utils/logger'
+import { API_STATUS_CODE } from '../../utils/httpUtil'
+import { logger } from '../../utils/logger'
 import type {
   BatchPayload,
   ComboEnvsGroupWithCount,
@@ -10,9 +10,9 @@ import type {
   envsModel,
   envsWhereInput,
   PageResult,
-} from '../db'
-import db, { flattenEnvsGroupPageResult, flattenIncludeRelationCount } from '../db'
-import type { EnvTag, TypeCategory } from '../core/env'
+} from '../../db'
+import db, { flattenEnvsGroupPageResult, flattenIncludeRelationCount } from '../../db'
+import type { EnvTag, TypeCategory } from '../../core/env'
 import {
   checkVaribleExsit,
   convertToCLIExport,
@@ -26,16 +26,16 @@ import {
   tagLabelContainsFilter,
   updateItemSortById,
   updateSortById,
-} from '../core/env'
-import { validateEnvName } from '../utils/envUtil'
-import type { ValidateObjectParamType } from '../utils'
+} from '../../core/env'
+import { validateEnvName } from '../../utils/envUtil'
+import type { ValidateObjectParamType } from '../../utils'
 import {
   cleanProperties,
   validateObject,
   validatePageFixedParams,
   validateRequestParams,
-} from '../utils'
-import { handleOpenApiError } from './openApi'
+} from '../../utils'
+import { handleOpenApiError } from '../openapi/openApiCore'
 
 const api: Express = express()
 const apiOpen: Express = express()

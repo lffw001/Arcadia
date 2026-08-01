@@ -5,7 +5,7 @@ import querystring from 'node:querystring'
 import { UAParser } from 'ua-parser-js'
 import { logger } from './logger'
 
-export { default as API_STATUS_CODE } from '../api/model'
+export { default as API_STATUS_CODE } from './statusCode'
 
 interface RequestConfig extends AxiosRequestConfig {
   body?: object | string
