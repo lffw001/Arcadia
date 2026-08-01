@@ -340,6 +340,8 @@ apiInner.post('/resetPwd', async (_request, response) => {
 
     // 关闭 2FA
     await disableTOTP()
+    // 轮换 JWT Secret，使所有已签发的 Token 立即失效
+    await rotateJwtSecret()
 
     response.send(API_STATUS_CODE.okData(data))
   }

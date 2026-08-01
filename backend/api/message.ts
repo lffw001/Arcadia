@@ -394,9 +394,7 @@ apiInner.post('/push', async (request, response) => {
     })
     const { title, content, type } = params.body
     await pushUserMessage({ title, content, type })
-    // 单用户系统，消息广播给所有在线客户端
-    const count = 1
-    response.send(API_STATUS_CODE.okData({ count }))
+    response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || e))
