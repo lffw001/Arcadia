@@ -1,5 +1,6 @@
 import type { Response } from 'express'
 import { dateToFileName, getDateStr, parseFileNameDate } from '../utils'
+import { getFsErrorMessage, isFsError } from '../utils/errorUtil'
 import { API_STATUS_CODE } from '../utils/httpUtil'
 import { logger } from '../utils/logger'
 import nodePath from 'node:path'
@@ -94,6 +95,13 @@ export interface CodeFileResolveResult {
   tags: string
 }
 
+// fs 原生错误保留原结构，仅翻译 message
+function transferFsError(err: unknown): never {
+  if (err instanceof Error && isFsError(err))
+    err.message = getFsErrorMessage(err)
+  throw err
+}
+
 /**
  * 获取文件列表（仅一层，非递归）
  *
@@ -102,8 +110,15 @@ export interface CodeFileResolveResult {
  * @returns {object}
  */
 export function getFileList(dirPath: string, showCount: boolean = false): FileList {
-  const files = fs.readdirSync(dirPath)
-  const dirStats = fs.statSync(dirPath)
+  let files: string[]
+  let dirStats: fs.Stats
+  try {
+    files = fs.readdirSync(dirPath)
+    dirStats = fs.statSync(dirPath)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
   const result: FileList = {
     // 构造文件夹数据
     path: dirPath,
@@ -572,7 +587,12 @@ export function saveNewConf(file: string, content: string, isBak: boolean = true
     case APP_FILE_TYPE.CONFIG:
     case APP_FILE_NAME.CONFIG:
       // 备份旧的文件到 bak 目录
-      fs.writeFileSync(APP_FILE_PATH.CONFIG, content)
+      try {
+        fs.writeFileSync(APP_FILE_PATH.CONFIG, content)
+      }
+      catch (err) {
+        transferFsError(err)
+      }
       isBak && checkConfigSave(oldContent)
       break
     default:
@@ -607,7 +627,12 @@ export function getFile(fileKey: string): string {
  */
 function getFileContentByName(filePath: string): string {
   if (fs.existsSync(filePath)) {
-    return getNeatContent(fs.readFileSync(filePath, 'utf8'))
+    try {
+      return getNeatContent(fs.readFileSync(filePath, 'utf8'))
+    }
+    catch (err) {
+      transferFsError(err)
+    }
   }
   return ''
 }
@@ -638,7 +663,12 @@ export function saveFile(filePath: string, content: string) {
   if (canRunCodeFileExtList.some((ext) => filePath.endsWith(`.${ext}`))) {
     content = content.replace(/\r\n/g, '\n')
   }
-  fs.writeFileSync(filePath, content)
+  try {
+    fs.writeFileSync(filePath, content)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
 }
 
 /**
@@ -657,7 +687,12 @@ export function createDebugTempFile(originalFilePath: string, runId: string, con
   const tempFileName = `${baseName.startsWith('.') ? baseName : `.${baseName}`}_debug_${runId}.${ext}`
   const tempFilePath = nodePath.join(dir, tempFileName)
   checkPathBoundary(tempFilePath)
-  fs.writeFileSync(tempFilePath, content.replace(/\r\n/g, '\n'))
+  try {
+    fs.writeFileSync(tempFilePath, content.replace(/\r\n/g, '\n'))
+  }
+  catch (err) {
+    transferFsError(err)
+  }
   return tempFilePath
 }
 
@@ -733,7 +768,12 @@ export function fileRename(filePath: string, name: string) {
   const parentPath = nodePath.join(filePath, '../')
   const newPath = nodePath.join(parentPath, name)
   checkPathBoundary(newPath)
-  fs.renameSync(filePath, newPath)
+  try {
+    fs.renameSync(filePath, newPath)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
 }
 
 /**
@@ -762,13 +802,29 @@ function clearDirectory(folderPath: string) {
  * @param filePath 当前路径
  */
 export function fileDelete(filePath: string) {
-  const file = fs.statSync(filePath)
+  let file: fs.Stats
+  try {
+    file = fs.statSync(filePath)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
   if (file.isDirectory()) {
     clearDirectory(filePath)
-    fs.rmdirSync(filePath)
+    try {
+      fs.rmdirSync(filePath)
+    }
+    catch (err) {
+      transferFsError(err)
+    }
     return
   }
-  fs.unlinkSync(filePath)
+  try {
+    fs.unlinkSync(filePath)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
 }
 
 /**
@@ -780,7 +836,12 @@ export function fileDelete(filePath: string) {
 export function fileMove(filePath: string, newPath: string) {
   checkPathBoundary(newPath)
   const resolvedNewPath = nodePath.resolve(newPath)
-  fs.renameSync(filePath, resolvedNewPath)
+  try {
+    fs.renameSync(filePath, resolvedNewPath)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
 }
 
 /**
@@ -791,14 +852,20 @@ export function fileMove(filePath: string, newPath: string) {
  */
 export function fileDownload(fileOrFolderPath: string, response: Response) {
   fileOrFolderPath = nodePath.resolve(fileOrFolderPath)
-  const file = fs.statSync(fileOrFolderPath)
+  let file: fs.Stats
+  try {
+    file = fs.statSync(fileOrFolderPath)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
   const fileName = nodePath.basename(fileOrFolderPath)
   if (file.isDirectory()) {
     const archive = new ZipArchive({})
     archive.on('error', (err) => {
       logger.error(`压缩归档出错: ${err?.message ?? err}`)
       if (!response.headersSent) {
-        response.send(API_STATUS_CODE.fail(err.message))
+        response.send(API_STATUS_CODE.fail(getFsErrorMessage(err)))
       }
       else {
         response.end()
@@ -811,7 +878,7 @@ export function fileDownload(fileOrFolderPath: string, response: Response) {
     archive.finalize().catch((err: Error) => {
       logger.error(`压缩归档完成失败: ${err?.message ?? err}`)
       if (!response.headersSent) {
-        response.send(API_STATUS_CODE.fail(err.message))
+        response.send(API_STATUS_CODE.fail(getFsErrorMessage(err)))
       }
       else {
         response.end()
@@ -824,7 +891,7 @@ export function fileDownload(fileOrFolderPath: string, response: Response) {
       .on('error', (err) => {
         logger.error(`文件读取出错: ${err?.message ?? err}`)
         if (!response.headersSent) {
-          response.send(API_STATUS_CODE.fail(err.message))
+          response.send(API_STATUS_CODE.fail(getFsErrorMessage(err)))
         }
         else {
           response.end()
@@ -843,18 +910,28 @@ export function fileDownload(fileOrFolderPath: string, response: Response) {
  * @param {string} content - 内容
  */
 export function fileCreate(fileDir: string, fileName: string, type: string, content: string = '') {
-  if (!fs.existsSync(fileDir)) {
-    fs.mkdirSync(fileDir)
+  try {
+    if (!fs.existsSync(fileDir)) {
+      fs.mkdirSync(fileDir)
+    }
+  }
+  catch (err) {
+    transferFsError(err)
   }
   const filePath = nodePath.join(fileDir, fileName)
   if (fs.existsSync(filePath)) {
     throw new Error(`${fileDir}目录下已经含有${fileName}该文件（夹）`)
   }
-  if (type === APP_FILE_TYPES.FOLDER) {
-    fs.mkdirSync(filePath)
+  try {
+    if (type === APP_FILE_TYPES.FOLDER) {
+      fs.mkdirSync(filePath)
+    }
+    else {
+      fs.writeFileSync(filePath, content)
+    }
   }
-  else {
-    fs.writeFileSync(filePath, content)
+  catch (err) {
+    transferFsError(err)
   }
   return filePath
 }
@@ -878,7 +955,13 @@ interface FileInfo {
  * @param {string} filePath - 路径
  */
 export function fileInfo(filePath: string): FileInfo {
-  const stat = fs.statSync(filePath)
+  let stat: fs.Stats
+  try {
+    stat = fs.statSync(filePath)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
   const size = !stat.isDirectory() ? stat.size : getDirectorySize(filePath)
   return {
     type: stat.isDirectory() ? APP_FILE_TYPES.FOLDER : APP_FILE_TYPES.FILE,
