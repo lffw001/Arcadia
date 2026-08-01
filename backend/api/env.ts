@@ -35,6 +35,7 @@ import {
   validatePageFixedParams,
   validateRequestParams,
 } from '../utils'
+import { handleOpenApiError } from './openApi'
 
 const api: Express = express()
 const apiOpen: Express = express()
@@ -307,7 +308,7 @@ apiOpen.get('/v1/page', async (request, response) => {
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 获取环境变量分页列表')
   }
 })
 
@@ -384,7 +385,7 @@ apiOpen.get('/v1/query', async (request, response) => {
     }
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 查询环境变量')
   }
 })
 
@@ -424,7 +425,7 @@ apiOpen.get('/v1/queryMember', async (request, response) => {
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 查询复合变量成员')
   }
 })
 
@@ -459,7 +460,7 @@ apiOpen.get('/v1/queryById', async (request, response) => {
     response.send(API_STATUS_CODE.okData(record))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 查询环境变量详情')
   }
 })
 
@@ -660,7 +661,7 @@ apiOpen.post('/v1/create', async (request, response) => {
     await onChange(category !== EnvTypes.COMPOSITE)
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 创建环境变量')
   }
 })
 
@@ -787,7 +788,7 @@ apiOpen.post('/v1/update', async (request, response) => {
     await onChange(category !== EnvTypes.COMPOSITE)
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 修改环境变量')
   }
 })
 
@@ -882,7 +883,7 @@ apiOpen.post('/v1/changeStatus', async (request, response) => {
     await onChange(!isComposite)
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 更改环境变量状态')
   }
 })
 
@@ -969,7 +970,7 @@ apiOpen.post('/v1/delete', async (request, response) => {
     await onChange(!isComposite)
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 删除环境变量')
   }
 })
 
@@ -1105,7 +1106,7 @@ apiOpen.post('/v1/order', async (request, response) => {
     await onChange(!isComposite)
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 调整环境变量排序')
   }
 })
 
@@ -1172,7 +1173,7 @@ apiOpen.get('/v1/tags', async (request, response) => {
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Env] 获取环境变量标签')
   }
 })
 

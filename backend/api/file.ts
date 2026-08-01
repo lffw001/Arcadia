@@ -29,6 +29,7 @@ import {
 } from '../server/fileCore'
 import { APP_DIR_PATH, APP_DIR_TYPE, APP_ROOT_DIR } from '../core/type'
 import { validateRequestParams } from '../utils'
+import { handleOpenApiError } from './openApi'
 
 const api: Express = express()
 const apiOpen: Express = express()
@@ -69,7 +70,7 @@ apiOpen.get('/v1/list', (request, response) => {
     response.send(API_STATUS_CODE.okData(getFileList(path, includeCount)))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · File] 获取文件列表')
   }
 })
 
@@ -182,7 +183,7 @@ apiOpen.get('/v1/content', (request, response) => {
     response.send(API_STATUS_CODE.okData(getFile(path)))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · File] 获取文件内容')
   }
 })
 
@@ -216,8 +217,7 @@ apiOpen.post('/v1/content', (request, response) => {
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
-    logger.error('文件保存失败', e.message || e)
-    response.send(API_STATUS_CODE.fail(`保存失败：${e.message}`))
+    handleOpenApiError(e, response, '[OpenAPI · File] 保存文件内容', '保存失败')
   }
 })
 
@@ -247,7 +247,7 @@ apiOpen.get('/v1/info', (request, response) => {
     response.send(API_STATUS_CODE.okData(fileInfo(path)))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · File] 查看文件信息')
   }
 })
 
@@ -282,8 +282,7 @@ apiOpen.post('/v1/rename', (request, response) => {
     logger.info('[OpenAPI · File]', '文件或目录重命名', path, name)
   }
   catch (e: any) {
-    logger.error('文件或目录重命名失败', e.message || e)
-    response.send(API_STATUS_CODE.fail(`重命名失败：${e.message || e}`))
+    handleOpenApiError(e, response, '[OpenAPI · File] 文件或目录重命名', '重命名失败')
   }
 })
 
@@ -314,8 +313,7 @@ apiOpen.post('/v1/move', (request, response) => {
     logger.info('[OpenAPI · File]', '文件或目录移动', oldPath, newPath)
   }
   catch (e: any) {
-    logger.error('文件或目录移动失败', e.message || e)
-    response.send(API_STATUS_CODE.fail(`移动失败：${e.message || e}`))
+    handleOpenApiError(e, response, '[OpenAPI · File] 文件或目录移动', '移动失败')
   }
 })
 
@@ -348,8 +346,7 @@ apiOpen.post('/v1/create', (request, response) => {
     response.send(API_STATUS_CODE.okData(fileCreate(path, name, type)))
   }
   catch (e: any) {
-    logger.error('文件或目录创建失败', e.message || e)
-    response.send(API_STATUS_CODE.fail(`创建失败：${e.message || e}`))
+    handleOpenApiError(e, response, '[OpenAPI · File] 创建文件或目录', '创建失败')
   }
 })
 
@@ -402,8 +399,7 @@ apiOpen.delete('/v1/delete', (request, response) => {
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
-    logger.error('件或目录删除失败', e.message || e)
-    response.send(API_STATUS_CODE.fail(`删除失败：${e.message || e}`))
+    handleOpenApiError(e, response, '[OpenAPI · File] 删除文件或目录', '删除失败')
   }
 })
 
@@ -435,8 +431,7 @@ apiOpen.get('/v1/download', (request, response) => {
     logger.info('[OpenAPI · File]', '文件或目录下载', path)
   }
   catch (e: any) {
-    logger.error('文件或目录下载失败', e.message || e)
-    response.send(API_STATUS_CODE.fail(`下载失败：${e.message || e}`))
+    handleOpenApiError(e, response, '[OpenAPI · File] 文件或目录下载', '下载失败')
   }
 })
 

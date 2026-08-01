@@ -30,6 +30,7 @@ import {
 import { getDashboardRunning, getDashboardStats, getDashboardTrend } from '../core/cron/query'
 import { isValidTasksFilterType, TasksTypeEnum } from '../core/type/cron'
 import type { TaskConfigModel, TasksType } from '../core/type/cron'
+import { handleOpenApiError } from './openApi'
 
 const api: Express = express()
 const apiOpen: Express = express()
@@ -239,7 +240,7 @@ apiOpen.get('/v1/page', async (request, response) => {
     response.send(API_STATUS_CODE.okData(tasks))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Cron] 获取定时任务列表')
   }
 })
 
@@ -266,7 +267,7 @@ apiOpen.get('/v1/query', async (request, response) => {
     response.send(API_STATUS_CODE.okData(record))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Cron] 查询定时任务')
   }
 })
 
@@ -327,7 +328,7 @@ apiOpen.post('/v1/create', async (request, response) => {
     }
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Cron] 创建定时任务')
   }
 })
 
@@ -429,7 +430,7 @@ apiOpen.post('/v1/update', async (request, response) => {
     }
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Cron] 修改定时任务')
   }
 })
 
@@ -478,14 +479,14 @@ apiOpen.post('/v1/delete', async (request, response) => {
     }
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Cron] 删除定时任务')
   }
 })
 
 /**
  * 调整排序
  */
-async function order(request: Request, response: Response) {
+async function order(request: Request, response: Response, useOpenApiHandler = false) {
   try {
     // 传参校验
     const params = validateRequestParams(request, {
@@ -524,45 +525,60 @@ async function order(request: Request, response: Response) {
     await fixOrder()
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    if (useOpenApiHandler) {
+      handleOpenApiError(e, response, '[OpenAPI · Cron] 调整排序')
+    }
+    else {
+      response.send(API_STATUS_CODE.fail(e.message || e))
+    }
   }
 }
 api.put('/order', async (request, response) => {
   await order(request, response)
 })
 apiOpen.post('/v1/order', async (request, response) => {
-  await order(request, response)
+  await order(request, response, true)
 })
 
 /**
  * 获取标签列表
  */
-async function bindGroup(response: Response) {
+async function bindGroup(response: Response, useOpenApiHandler = false) {
   try {
     const result = await getBindGroup()
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    if (useOpenApiHandler) {
+      handleOpenApiError(e, response, '[OpenAPI · Cron] 获取标签列表')
+    }
+    else {
+      response.send(API_STATUS_CODE.fail(e.message || e))
+    }
   }
 }
 api.get('/bindGroup', async (_request, response) => {
   await bindGroup(response)
 })
 apiOpen.get('/v1/tagsList', async (_request, response) => {
-  await bindGroup(response)
+  await bindGroup(response, true)
 })
 
 /**
  * 查询正在运行中的任务
  */
-function getRunningTasks(response: Response) {
+function getRunningTasks(response: Response, useOpenApiHandler = false) {
   try {
     const result = getAllRunningInstances()
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    if (useOpenApiHandler) {
+      handleOpenApiError(e, response, '[OpenAPI · Cron] 查询运行中的任务')
+    }
+    else {
+      response.send(API_STATUS_CODE.fail(e.message || e))
+    }
   }
 }
 api.get('/runningTasks', (_request, response) => {
@@ -570,7 +586,7 @@ api.get('/runningTasks', (_request, response) => {
 })
 
 apiOpen.get('/v1/runningTasks', (_request, response) => {
-  getRunningTasks(response)
+  getRunningTasks(response, true)
 })
 
 /**
@@ -602,8 +618,7 @@ apiOpen.post('/v1/run', async (request, response) => {
     logger.info('[OpenAPI · Cron]', '运行定时任务', ids.join(','))
   }
   catch (e: any) {
-    logger.error(e)
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Cron] 运行定时任务')
   }
 })
 
@@ -636,8 +651,7 @@ apiOpen.post('/v1/terminate', async (request, response) => {
     logger.info('[OpenAPI · Cron]', '终止定时任务', ids.join(','))
   }
   catch (e: any) {
-    logger.error(e)
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Cron] 终止定时任务')
   }
 })
 

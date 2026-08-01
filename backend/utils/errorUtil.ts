@@ -6,7 +6,7 @@ import {
   PrismaClientValidationError,
 } from '@prisma/client/runtime/client'
 
-// Prisma 已知错误码 → 面向用户的提示
+// 数据库已知错误码 → 面向用户的提示
 const PRISMA_KNOWN_ERROR_MAP: Record<string, string> = {
   P2000: '数据库操作失败：字段值超出允许长度',
   P2001: '操作的目标记录不存在',
@@ -76,13 +76,12 @@ const FS_ERROR_MAP: Record<string, string> = {
 const FS_FALLBACK = '文件操作异常，请稍后重试'
 const UNKNOWN_ERROR_MESSAGE = '服务器内部错误'
 
-export type OpenApiErrorKind = 'prisma-known' | 'prisma' | 'fs' | 'business' | 'unknown'
+export type OpenApiErrorKind = 'database' | 'database-unknown' | 'fs' | 'business' | 'unknown'
 
 export interface ResolvedErrorMessage {
   message: string
   kind: OpenApiErrorKind
   code?: string
-  name?: string
   syscall?: string
 }
 
@@ -109,7 +108,7 @@ export function getFsErrorMessage(err: unknown): string {
 export function resolveErrorMessage(error: unknown): ResolvedErrorMessage {
   if (error instanceof PrismaClientKnownRequestError) {
     return {
-      kind: 'prisma-known',
+      kind: 'database',
       code: error.code,
       message: PRISMA_INTERNAL_CODES.has(error.code)
         ? PRISMA_INTERNAL_FALLBACK
@@ -124,8 +123,7 @@ export function resolveErrorMessage(error: unknown): ResolvedErrorMessage {
     || error instanceof PrismaClientRustPanicError
   ) {
     return {
-      kind: 'prisma',
-      name: error.name,
+      kind: 'database-unknown',
       message: error instanceof PrismaClientInitializationError
         ? '数据库连接异常，请稍后重试'
         : PRISMA_INTERNAL_FALLBACK,

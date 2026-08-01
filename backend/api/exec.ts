@@ -16,6 +16,7 @@ import { CLI_CMD } from '../core/type/cli'
 import { buildRunCodeFileCmd, makeNoopRunCallbacks, makeSocketRunCallbacks, runCodeFile, runningExecTasks, runShellCmd } from '../core/runner'
 import type { RunEnv, RunOption } from '../core/runner'
 import { createSession } from 'better-sse'
+import { handleOpenApiError } from './openApi'
 
 const api: Express = express()
 const apiOpen: Express = express()
@@ -44,7 +45,7 @@ function execStatusHandler(request: Request, response: Response) {
 /**
  * 停止运行中的任务（按代码文件路径）
  */
-function execFileStopHandler(request: Request, response: Response) {
+function execFileStopHandler(request: Request, response: Response, useOpenApiHandler = false) {
   try {
     const params = validateRequestParams(request, {
       body: [
@@ -75,7 +76,12 @@ function execFileStopHandler(request: Request, response: Response) {
     )
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e?.message || '执行失败'))
+    if (useOpenApiHandler) {
+      handleOpenApiError(e, response, '[OpenAPI · Exec] 停止运行代码文件')
+    }
+    else {
+      response.send(API_STATUS_CODE.fail(e?.message || '执行失败'))
+    }
   }
 }
 
@@ -153,7 +159,7 @@ apiOpen.post('/v1/cmd', (request, response) => {
     response.send(API_STATUS_CODE.okData(runId))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e?.message || '执行失败'))
+    handleOpenApiError(e, response, '[OpenAPI · Exec] 执行 Shell 命令')
   }
 })
 
@@ -190,7 +196,7 @@ apiOpen.post('/v1/cmd/stream', async (request, response) => {
     }
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e?.message || '执行失败'))
+    handleOpenApiError(e, response, '[OpenAPI · Exec] 执行 Shell 命令（流式）')
   }
 })
 
@@ -316,7 +322,7 @@ apiOpen.post('/v1/file', (request, response) => {
     response.send(API_STATUS_CODE.okData(runId))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e?.message || '执行失败'))
+    handleOpenApiError(e, response, '[OpenAPI · Exec] 运行代码文件')
   }
 })
 
@@ -359,15 +365,19 @@ apiOpen.post('/v1/file/stream', async (request, response) => {
     }
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e?.message || '执行失败'))
+    handleOpenApiError(e, response, '[OpenAPI · Exec] 运行代码文件（流式）')
   }
 })
 
 /**
  * 停止运行中的任务
  */
-api.post('/file/stop', execFileStopHandler)
-apiOpen.post('/v1/file/stop', execFileStopHandler)
+api.post('/file/stop', (request, response) => {
+  execFileStopHandler(request, response, false)
+})
+apiOpen.post('/v1/file/stop', (request, response) => {
+  execFileStopHandler(request, response, true)
+})
 
 export {
   api as API,

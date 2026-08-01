@@ -5,6 +5,7 @@ import type { messageWhereInput } from '../db'
 import db from '../db'
 import { validatePageFixedParams, validateRequestParams } from '../utils'
 import { getUnreadCount, pushUserMessage } from '../core/message'
+import { handleOpenApiError } from './openApi'
 
 const api: Express = express()
 const apiOpen: Express = express()
@@ -261,7 +262,7 @@ apiOpen.post('/v1/create', async (request, response) => {
     response.send(API_STATUS_CODE.okData({ count: 1 }))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Message] 推送消息')
   }
 })
 
@@ -280,7 +281,7 @@ apiOpen.get('/v1/list', async (request, response) => {
     response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Message] 分页查询消息')
   }
 })
 
@@ -293,7 +294,7 @@ apiOpen.get('/v1/unreadCount', async (_request, response) => {
     response.send(API_STATUS_CODE.okData({ total }))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Message] 获取未读消息计数')
   }
 })
 
@@ -315,7 +316,7 @@ apiOpen.get('/v1/detail', async (request, response) => {
     response.send(API_STATUS_CODE.okData(message))
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Message] 获取消息详情')
   }
 })
 
@@ -336,7 +337,7 @@ apiOpen.post('/v1/readStatus', async (request, response) => {
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Message] 标记消息已读')
   }
 })
 
@@ -355,7 +356,7 @@ apiOpen.post('/v1/readAll', async (request, response) => {
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Message] 全部标记已读')
   }
 })
 
@@ -375,7 +376,7 @@ apiOpen.post('/v1/delete', async (request, response) => {
     response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
-    response.send(API_STATUS_CODE.fail(e.message || e))
+    handleOpenApiError(e, response, '[OpenAPI · Message] 删除消息')
   }
 })
 

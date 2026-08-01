@@ -1,9 +1,10 @@
-import type { RequestHandler } from 'express'
+import type { RequestHandler, Response } from 'express'
 import type { openApiAccessKeyModel } from '../../db'
 import db from '../../db'
 import { randomString } from '../../utils'
+import { resolveErrorMessage } from '../../utils/errorUtil'
 import { logger } from '../../utils/logger'
-import { getClientIP, ip2AddressCached, parseUserAgent } from '../../utils/httpUtil'
+import { API_STATUS_CODE, getClientIP, ip2AddressCached, parseUserAgent } from '../../utils/httpUtil'
 import { enqueueOpenApiLog } from '../../core/log'
 
 // 权限键定义
@@ -266,4 +267,38 @@ export const openApiLogMiddleware: RequestHandler = (req, res, next) => {
     }).catch(() => {})
   })
   next()
+}
+
+/**
+ * OpenAPI 统一错误处理
+ *
+ * 在 OpenAPI 接口的顶层 catch 中调用：
+ * 解析出安全的客户端消息，原始错误写入 logger。
+ *
+ * @param context 日志上下文标签
+ * @param prefix  客户端消息前缀，最终消息为 `${prefix}：${message}`
+ */
+export function handleOpenApiError(error: unknown, response: Response, context?: string, prefix?: string): void {
+  const tag = context || 'OpenAPI 错误'
+  const raw = error instanceof Error ? error.stack || error.message : String(error)
+  const { message, kind, code, syscall } = resolveErrorMessage(error)
+
+  switch (kind) {
+    case 'database':
+      logger.error(tag, `数据库错误 [${code}]`, raw)
+      break
+    case 'database-unknown':
+      logger.error(tag, '未知数据库错误', raw)
+      break
+    case 'fs':
+      logger.error(tag, `文件系统错误 [${code}] syscall=${syscall || '无'}`, raw)
+      break
+    case 'unknown':
+      logger.error(tag, '未知错误类型', raw)
+      break
+    default:
+      logger.error(tag, raw)
+  }
+
+  response.send(API_STATUS_CODE.fail(prefix ? `${prefix}：${message}` : message))
 }
