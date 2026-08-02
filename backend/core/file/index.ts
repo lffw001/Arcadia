@@ -39,7 +39,7 @@ export const canRunCodeFileExtList = [
 const protectedPaths = [APP_FILE_PATH.DB]
 const openApiProtectedPaths = [APP_FILE_PATH.ENV]
 // 默认过滤的文件路径
-const defaultFilterPaths = [APP_FILE_PATH.DB]
+const defaultFilterPaths = [APP_FILE_PATH.DB, APP_FILE_PATH.CLI_CONFIG]
 // 全局过滤正则
 const excludeRegExp = /(user\.session)|(bot\.session)|(\.cache$)|(\.check$)|(\.git$)|(\.tmp$)|(__pycache__$)|(node_modules)|(Cargo\.lock$)|(go\.sum$)|(\.gem$)|(\.bundle\/)|(\.cargo\/)|(__MACOSX\/)|(\.rbc$)|(\.luac$)|(\.o$)|(\.a$)|(\.dll$)|(\.exe$)|(\.out$)|(\.pyc$)|(\.class$)|(\.elc$)|(\.beam$)|(\.hi$)|(\.dSYM\/)|(\.ipynb_checkpoints\/)|(\.rustup\/)|(\.cargo-cache\/)|(\.luarocks\/)|(\.rbenv\/)|(\.rvm\/)|(\.cabal\/)|(\.stack-work\/)|(\.perl\/)/
 
