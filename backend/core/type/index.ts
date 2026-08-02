@@ -4,16 +4,14 @@ export const APP_ROOT_DIR = path.resolve(import.meta.dirname, '../../../../') //
 export const APP_SOURCE_DIR = path.join(import.meta.dirname, '../../../') // 源码目录 /arcadia/src
 export const APP_PUBLIC_DIR = path.join(APP_SOURCE_DIR, 'public') // 静态文件目录 /arcadia/src/public
 
-export enum APP_FILE_TYPE {
-  CONFIG = 'config',
-}
-
 export enum APP_FILE_NAME {
   DB = 'config.db',
   CONFIG = 'config.sh',
   ENV = 'env.sh',
   CLI_CONFIG = '.arcadia_cli_config.sh',
   EXTRA_SERVER = 'extra_server.js',
+  SYNC = 'sync.yml',
+  BOT = 'bot.json',
 }
 
 export enum APP_DIR_TYPE {

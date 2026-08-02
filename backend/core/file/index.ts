@@ -1,5 +1,5 @@
 import type { Response } from 'express'
-import { dateToFileName, getDateStr, parseFileNameDate } from '../../utils'
+import { dateFormat, parseFileNameDate } from '../../utils'
 import { getFsErrorMessage, isFsError } from '../../utils/errorUtil'
 import { API_STATUS_CODE } from '../../utils/httpUtil'
 import { logger } from '../../utils/logger'
@@ -13,7 +13,6 @@ import {
   APP_DIR_TYPE,
   APP_FILE_NAME,
   APP_FILE_PATH,
-  APP_FILE_TYPE,
   APP_FILE_TYPES,
   APP_ROOT_DIR,
 } from '../type'
@@ -40,6 +39,8 @@ const protectedPaths = [APP_FILE_PATH.DB]
 const openApiProtectedPaths = [APP_FILE_PATH.ENV]
 // 默认过滤的文件路径
 const defaultFilterPaths = [APP_FILE_PATH.DB, APP_FILE_PATH.CLI_CONFIG]
+// 需要自动备份的配置文件（仅限 config 目录下）
+const backupConfigFileNames: string[] = [APP_FILE_NAME.CONFIG, APP_FILE_NAME.SYNC, APP_FILE_NAME.BOT]
 // 全局过滤正则
 const excludeRegExp = /(user\.session)|(bot\.session)|(\.cache$)|(\.check$)|(\.git$)|(\.tmp$)|(__pycache__$)|(node_modules)|(Cargo\.lock$)|(go\.sum$)|(\.gem$)|(\.bundle\/)|(\.cargo\/)|(__MACOSX\/)|(\.rbc$)|(\.luac$)|(\.o$)|(\.a$)|(\.dll$)|(\.exe$)|(\.out$)|(\.pyc$)|(\.class$)|(\.elc$)|(\.beam$)|(\.hi$)|(\.dSYM\/)|(\.ipynb_checkpoints\/)|(\.rustup\/)|(\.cargo-cache\/)|(\.luarocks\/)|(\.rbenv\/)|(\.rvm\/)|(\.cabal\/)|(\.stack-work\/)|(\.perl\/)/
 
@@ -519,28 +520,30 @@ export function initAppFileSystem() {
 
 /**
  * 备份配置文件，并返回旧的文件内容
+ *
+ * @param {string} filePath - 配置文件路径
  */
-function bakConfigFile(file: string) {
+function bakConfigFile(filePath: string) {
   // 检查 config/bak/ 备份目录是否存在，不存在则创建
   if (!fs.existsSync(APP_DIR_PATH.CONFIG_BAK)) {
     fs.mkdirSync(APP_DIR_PATH.CONFIG_BAK)
   }
   const date = new Date()
-  const bakDir = nodePath.join(APP_DIR_PATH.CONFIG_BAK, getDateStr(date))
-  if (!fs.existsSync(bakDir)) {
-    fs.mkdirSync(bakDir)
-  }
-  const bakFilePath = `${bakDir}/${file}_${dateToFileName(date)}`
-  let oldConfContent = ''
-  switch (file) {
-    case APP_FILE_TYPE.CONFIG:
-      oldConfContent = getFileContentByName(APP_FILE_PATH.CONFIG)
-      fs.writeFileSync(bakFilePath, oldConfContent)
-      break
-    default:
-      break
-  }
+  const ext = nodePath.extname(filePath)
+  const baseName = nodePath.basename(filePath, ext)
+  const bakFilePath = nodePath.join(APP_DIR_PATH.CONFIG_BAK, `${baseName}-${dateFormat('yyyy-MM-dd-hh-mm-ss', date)}${ext}`)
+  const oldConfContent = getFile(filePath)
+  fs.writeFileSync(bakFilePath, oldConfContent)
   return oldConfContent
+}
+
+/**
+ * 是否为备份白名单内的配置文件（位于 config 目录下）
+ *
+ * @param {string} filePath - 文件路径
+ */
+function isBackupConfigFile(filePath: string): boolean {
+  return nodePath.dirname(filePath) === APP_DIR_PATH.CONFIG && backupConfigFileNames.includes(nodePath.basename(filePath))
 }
 
 /**
@@ -577,55 +580,30 @@ function checkConfigSave(oldContent: string) {
 /**
  * 保存配置文件
  *
- * @param {string} file
- * @param {string} content
+ * @param {string} filePath - 配置文件路径（须为备份白名单内的文件）
+ * @param {string} content - 文件内容
  * @param {boolean} isBak - 是否备份
  */
-export function saveNewConf(file: string, content: string, isBak: boolean = true) {
-  const oldContent = isBak ? bakConfigFile(file) : ''
-  switch (file) {
-    case APP_FILE_TYPE.CONFIG:
-    case APP_FILE_NAME.CONFIG:
-      // 备份旧的文件到 bak 目录
-      try {
-        fs.writeFileSync(APP_FILE_PATH.CONFIG, content)
-      }
-      catch (err) {
-        transferFsError(err)
-      }
-      isBak && checkConfigSave(oldContent)
-      break
-    default:
-      break
+export function saveNewConf(filePath: string, content: string, isBak: boolean = true) {
+  const oldContent = isBak ? bakConfigFile(filePath) : ''
+  try {
+    fs.writeFileSync(filePath, content)
+  }
+  catch (err) {
+    transferFsError(err)
+  }
+  if (isBak && nodePath.basename(filePath) === APP_FILE_NAME.CONFIG) {
+    checkConfigSave(oldContent)
   }
 }
 
 /**
  * 获取文件内容
  *
- * @param fileKey
+ * @param filePath - 文件路径
  * @return {string}
  */
-export function getFile(fileKey: string): string {
-  let content: string
-  switch (fileKey) {
-    case APP_FILE_TYPE.CONFIG:
-      content = getFileContentByName(APP_FILE_PATH.CONFIG)
-      break
-    default:
-      content = getFileContentByName(fileKey)
-      break
-  }
-  return content
-}
-
-/**
- * 根据文件名称获取文件内容
- *
- * @param filePath 文件路径
- * @returns {string}
- */
-function getFileContentByName(filePath: string): string {
+export function getFile(filePath: string): string {
   if (fs.existsSync(filePath)) {
     try {
       return getNeatContent(fs.readFileSync(filePath, 'utf8'))
@@ -655,8 +633,8 @@ export function getJsonFile(fileKey: string): any {
  */
 export function saveFile(filePath: string, content: string) {
   checkPathAccess(filePath)
-  if (filePath === APP_FILE_PATH.CONFIG) {
-    saveNewConf(APP_FILE_TYPE.CONFIG, content, true)
+  if (isBackupConfigFile(filePath)) {
+    saveNewConf(filePath, content, true)
     return
   }
   // 将换行符强制替换为 LF（Unix）
