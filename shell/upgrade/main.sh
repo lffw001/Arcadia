@@ -13,7 +13,7 @@ function command_upgrade() {
     [ -f "${BackendDir}/package.json" ] && project_depend_old="$(cat "${BackendDir}/package.json")"
     ## 确认分支名称
     cd $SrcDir
-    local src_branch_name="$(git status | head -n 1 | awk -F ' ' '{print$NF}')"
+    local src_branch_name="$(git rev-parse --abbrev-ref HEAD)"
     cd $RootDir
     ## 更新仓库
     git_pull $SrcDir "${src_branch_name}" "Arcadia 源代码"

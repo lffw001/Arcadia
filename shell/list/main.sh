@@ -58,8 +58,8 @@ function list_designated() {
     cd $work_dir
     ## 打印仓库地址
     if [ -d .git ]; then
-        local remote_url=$(git remote -v | head -n 1 | awk -F ' ' '{print$2}')
-        echo "$remote_url" | grep "git@" -q
+        local remote_url="$(git remote get-url origin)"
+        echo "${remote_url}" | grep "git@" -q
         if [ $? -ne 0 ]; then
             echo -e "\n❖ 远程仓库地址: ${BLUE}${remote_url%\.*}${PLAIN}"
         fi
