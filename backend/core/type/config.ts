@@ -23,6 +23,12 @@ export enum ConfigKeyUser {
  */
 export enum ConfigKeyRuntime {
   JWT_SECRET = 'jwtSecret',
+  UPDATE_CHECK_LAST_AT = 'updateCheckLastAt',
+  UPDATE_PENDING_COMMIT = 'updatePendingCommit',
+  UPDATE_PENDING_TAG = 'updatePendingTag',
+  UPDATE_CURRENT_TAG = 'updateCurrentTag',
+  UPDATE_CURRENT_COMMIT = 'updateCurrentCommit',
+  UPDATE_UPGRADE_PENDING = 'updateUpgradePending',
 }
 
 /**
@@ -74,6 +80,12 @@ export interface ConfigDataUser {
 }
 export interface ConfigDataRuntime {
   jwtSecret: string
+  updateCheckLastAt: string
+  updatePendingCommit: string
+  updatePendingTag: string
+  updateCurrentTag: string
+  updateCurrentCommit: string
+  updateUpgradePending: string
 }
 export interface ConfigDataCli {
   REMOVE_LOG_DAYS_AGO: string
@@ -128,6 +140,12 @@ export const DEFAULT_CONFIG_VALUES: DefaultConfigValues = {
   },
   [ConfigModule.RUNTIME]: {
     [ConfigKeyRuntime.JWT_SECRET]: '',
+    [ConfigKeyRuntime.UPDATE_CHECK_LAST_AT]: '',
+    [ConfigKeyRuntime.UPDATE_PENDING_COMMIT]: '',
+    [ConfigKeyRuntime.UPDATE_PENDING_TAG]: '',
+    [ConfigKeyRuntime.UPDATE_CURRENT_TAG]: '',
+    [ConfigKeyRuntime.UPDATE_CURRENT_COMMIT]: '',
+    [ConfigKeyRuntime.UPDATE_UPGRADE_PENDING]: '',
   },
   [ConfigModule.CLI]: {
     [ConfigKeyCli.REMOVE_LOG_DAYS_AGO]: '7',

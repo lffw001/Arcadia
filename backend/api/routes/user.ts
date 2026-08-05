@@ -26,6 +26,7 @@ import {
   shouldShowCaptcha,
 } from '../../core/config/session'
 import { addLoginLog, getLastLoginInfo } from '../../core/log'
+import { triggerAutoCheckIfNeeded } from '../../core/update'
 
 const api: Express = express()
 const apiInner: Express = express()
@@ -289,6 +290,8 @@ api.get('/info', async (_request, response) => {
   const userConfig = await getUserModuleConfig()
   const lastLoginInfo = await getLastLoginInfo()
   response.send(API_STATUS_CODE.okData({ username: userConfig.username, lastLoginInfo: lastLoginInfo ?? {} }))
+  // 新版本检测（不阻塞响应）
+  triggerAutoCheckIfNeeded().catch(() => {})
 })
 
 /**

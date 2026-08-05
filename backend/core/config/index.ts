@@ -165,6 +165,19 @@ export async function getRuntimeModuleConfig() {
   }
   return result
 }
+
+/**
+ * 只读版本：列出 RUNTIME 模块现有记录并合并默认值，不补写缺失配置行
+ */
+export async function getRuntimeModuleConfigReadonly(): Promise<ConfigDataRuntime> {
+  const configs = await db.config.$list({ where: { module: ConfigModule.RUNTIME } })
+  const map = new Map(configs.map(c => [c.key, c.value]))
+  const result = {} as ConfigDataRuntime
+  for (const key of Object.values(ConfigKeyRuntime)) {
+    result[key] = map.get(key) ?? DEFAULT_CONFIG_VALUES[ConfigModule.RUNTIME][key]
+  }
+  return result
+}
 export async function getCliModuleConfig() {
   const map = await getModuleConfigMap(ConfigModule.CLI)
   const result = {} as ConfigDataCli

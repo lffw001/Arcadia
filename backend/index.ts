@@ -6,6 +6,7 @@ import { initSocketServer } from './server/socket'
 import { socketCommon } from './server/socketCommon'
 import { createApiAuthentication, registerApp } from './server/httpServer'
 import { initConfig } from './core/config'
+import { restoreUpgradeState } from './core/update'
 import { initTokenCache as initOpenApiAccessKeyCache } from './api/openapi/openApiCore'
 import { initLog } from './core/log'
 import { initTerminalServer } from './server/terminal'
@@ -48,6 +49,9 @@ async function startServer() {
 
   // 初始化守护任务日志实时推送命名空间
   initDaemonLogServer(io)
+
+  // 恢复未完成的更新状态
+  await restoreUpgradeState()
 
   // 启动服务
   server.listen(5678, '0.0.0.0', async () => {

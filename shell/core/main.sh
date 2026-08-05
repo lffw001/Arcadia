@@ -191,6 +191,20 @@ function get_absolute_path() {
     fi
 }
 
+## 打印当前版本信息
+function print_version() {
+    cd $SrcDir
+    local branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    local tag
+    if [[ "${branch}" == "dev" ]]; then
+        tag="Dev"
+    elif [[ "${branch}" == "main" ]]; then
+        tag="$(git describe --tags --abbrev=0 HEAD 2>/dev/null)"
+    fi
+    local commit="$(git rev-parse --short HEAD 2>/dev/null)"
+    echo -e "Arcadia ${tag:-unknown} (${commit:-unknown})"
+}
+
 ## 打印命令帮助
 function print_command_help() {
     import core/help

@@ -23,6 +23,7 @@ import { API as ApiLog } from '../api/routes/log'
 import { API as ApiConfig } from '../api/routes/config'
 import { API as ApiDaemon } from '../api/routes/daemon'
 import { API as ApiDep } from '../api/routes/dep'
+import { API as ApiUpdate, InnerAPI as InnerApiUpdate } from '../api/routes/update'
 
 function getToken(req: Request) {
   if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
@@ -184,6 +185,7 @@ export function registerApp(apiAuthentication: RequestHandler) {
   apiRouter.use('/config', ApiConfig)
   apiRouter.use('/daemon', ApiDaemon)
   apiRouter.use('/dependency', ApiDep)
+  apiRouter.use('/update', ApiUpdate)
   app.use('/api', apiAuthentication, handleAuthenticationError, apiRouter)
 
   /**
@@ -204,6 +206,7 @@ export function registerApp(apiAuthentication: RequestHandler) {
   innerRouter.use('/cron', InnerApiCron)
   innerRouter.use('/user', InnerApiUser)
   innerRouter.use('/message', InnerApiMessage)
+  innerRouter.use('/update', InnerApiUpdate)
   app.use('/api/inner', innerIpWhitelist, innerRouter)
 
   /**
