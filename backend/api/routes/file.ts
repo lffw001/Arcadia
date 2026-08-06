@@ -376,7 +376,7 @@ api.delete('/delete', (request, response) => {
   }
 })
 
-apiOpen.delete('/v1/delete', (request, response) => {
+apiOpen.post('/v1/delete', (request, response) => {
   try {
     const params = validateRequestParams(request, {
       body: [
