@@ -1,7 +1,7 @@
 import type { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
-import { getConfigValue, updateConfigValue } from '../config'
+import { getConfigValue, updateRuntimeConfigValue, updateRuntimeConfigValues } from '../config'
 import { APP_DIR_PATH, APP_FILE_PATH, APP_SOURCE_DIR } from '../type'
 import { ConfigKeyRuntime, ConfigModule } from '../type/config'
 import { updateConstants } from './constants'
@@ -166,7 +166,7 @@ export class UpdateCore {
     const tag = await this.getCurrentVersionTag()
     if (!tag)
       return this.getCachedVersionTag()
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_TAG, ConfigModule.RUNTIME, tag)
+    await updateRuntimeConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_TAG, tag)
     return tag
   }
 
@@ -180,10 +180,13 @@ export class UpdateCore {
       getConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_TAG, ConfigModule.RUNTIME),
       getConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, ConfigModule.RUNTIME),
     ])
+    const entries: Array<{ key: ConfigKeyRuntime, value: string }> = []
     if (cachedTag !== (tag ?? ''))
-      await updateConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_TAG, ConfigModule.RUNTIME, tag ?? '')
+      entries.push({ key: ConfigKeyRuntime.UPDATE_CURRENT_TAG, value: tag ?? '' })
     if (cachedCommit !== fullCommit)
-      await updateConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, ConfigModule.RUNTIME, fullCommit)
+      entries.push({ key: ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, value: fullCommit })
+    if (entries.length > 0)
+      await updateRuntimeConfigValues(entries)
   }
 }
 

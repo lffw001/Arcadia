@@ -1,5 +1,5 @@
 import { Secret, TOTP } from 'otpauth'
-import { getUserConfigValue, updateUserConfigValue } from './index'
+import { getUserConfigValue, updateUserConfigValue, updateUserConfigValues } from './index'
 import { ConfigKeyUser } from '../type/config'
 
 /**
@@ -115,8 +115,10 @@ export async function enableTOTP() {
  * 禁用 TOTP
  */
 export async function disableTOTP() {
-  await updateUserConfigValue(ConfigKeyUser.TOTP_ENABLED, 'false')
-  await updateUserConfigValue(ConfigKeyUser.TOTP_SECRET, '')
+  await updateUserConfigValues([
+    { key: ConfigKeyUser.TOTP_ENABLED, value: 'false' },
+    { key: ConfigKeyUser.TOTP_SECRET, value: '' },
+  ])
 }
 
 /**

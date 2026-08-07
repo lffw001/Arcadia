@@ -1,6 +1,6 @@
-import { getRuntimeModuleConfigReadonly, updateConfigValue } from '../config'
+import { getRuntimeModuleConfigReadonly, updateRuntimeConfigValue, updateRuntimeConfigValues } from '../config'
 import { socketCommon } from '../../server/socketCommon'
-import { ConfigKeyRuntime, ConfigModule } from '../type/config'
+import { ConfigKeyRuntime } from '../type/config'
 import { isUpgradeRunning } from './execute'
 import type { UpdateSnapshot } from './types'
 import { updateCore } from './updateCore'
@@ -52,13 +52,15 @@ export async function refreshVersionStateAfterUpgrade(): Promise<void> {
   const pendingCommit = runtime[ConfigKeyRuntime.UPDATE_PENDING_COMMIT]
   const localHead = await updateCore.getCommit('HEAD')
   if (pendingCommit && localHead && await updateCore.isCommitIncluded(pendingCommit, localHead)) {
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT, ConfigModule.RUNTIME, '')
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_TAG, ConfigModule.RUNTIME, '')
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME, '')
+    await updateRuntimeConfigValues([
+      { key: ConfigKeyRuntime.UPDATE_PENDING_COMMIT, value: '' },
+      { key: ConfigKeyRuntime.UPDATE_PENDING_TAG, value: '' },
+      { key: ConfigKeyRuntime.UPDATE_NOTIFIED, value: '' },
+    ])
   }
 
   await resolveCurrentVersionTag()
   if (localHead)
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, ConfigModule.RUNTIME, localHead)
+    await updateRuntimeConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, localHead)
   socketCommon.emit('update:refresh', {})
 }

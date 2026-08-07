@@ -5,6 +5,7 @@ import { APP_DIR_PATH } from '../type'
 import { ConfigKeySystem, ConfigModule } from '../type/config'
 import { reapplyAllTimezone, setCronTimezone } from '../cron/engine'
 import db from '../../db'
+import { updateSystemConfigValues } from './update'
 
 const DEP_SH_PATH = path.join(APP_DIR_PATH.SHELL, 'utils/dep.sh')
 
@@ -63,21 +64,17 @@ export async function detectAndSaveSourcesIfEmpty(): Promise<void> {
     { key: ConfigKeySystem.GEM_REGISTRY, ecosystem: 'gem' },
   ]
 
-  const saves: Promise<any>[] = []
+  const entries: Array<{ key: ConfigKeySystem, value: string }> = []
   for (const { key, ecosystem } of detections) {
     if (!configMap[key]) {
       const detected = depGetSource(ecosystem)
       if (detected) {
-        saves.push(db.config.upsert({
-          where: { key_module: { key, module: ConfigModule.SYSTEM } },
-          update: { value: detected },
-          create: { key, module: ConfigModule.SYSTEM, value: detected },
-        }))
+        entries.push({ key, value: detected })
       }
     }
   }
-  if (saves.length > 0) {
-    await Promise.all(saves)
+  if (entries.length > 0) {
+    await updateSystemConfigValues(entries)
   }
 }
 

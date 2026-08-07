@@ -1,5 +1,11 @@
 import type { configModel } from '../../db'
-import type { ConfigDataCli, ConfigDataRuntime, ConfigDataSystem, ConfigDataUser, ConfigKey } from '../type/config'
+import type {
+  ConfigDataCli,
+  ConfigDataRuntime,
+  ConfigDataSystem,
+  ConfigDataUser,
+  ConfigKey,
+} from '../type/config'
 import db from '../../db'
 import {
   ConfigKeyCli,
@@ -12,30 +18,15 @@ import {
 import { generateCliConfigSh } from './cli'
 import { applySystemTimezone, detectAndSaveSourcesIfEmpty } from './system'
 import { isNotEmpty, randomString } from '../../utils'
+import {
+  updateModuleConfigValues,
+  updateSystemConfigValues,
+  updateUserConfigValues,
+  validateConfigFieldKey,
+} from './update'
 
-/**
- * 验证配置键是否有效
- */
-function validateConfigFieldKey(key: string, module: ConfigModule): void {
-  let validKeys: ConfigKey[] = []
-  switch (module) {
-    case ConfigModule.RUNTIME:
-      validKeys = Object.values(ConfigKeyRuntime)
-      break
-    case ConfigModule.USER:
-      validKeys = Object.values(ConfigKeyUser)
-      break
-    case ConfigModule.CLI:
-      validKeys = Object.values(ConfigKeyCli)
-      break
-    case ConfigModule.SYSTEM:
-      validKeys = Object.values(ConfigKeySystem)
-      break
-  }
-  if (!validKeys.includes(key as any)) {
-    throw new Error(`无效的配置键: module=${module}, key=${key}`)
-  }
-}
+export { updateCliConfigValues, updateRuntimeConfigValues, updateSystemConfigValues, updateUserConfigValues } from './update'
+
 function validateConfigFieldModule(module: string) {
   const validModules = Object.values(ConfigModule) as ConfigModule[]
   if (!validModules.includes(module as any)) {
@@ -116,14 +107,14 @@ async function getModuleConfigMap(module: ConfigModule): Promise<Record<string, 
     const existingKeys = new Set(configs.map(c => c.key))
     const defaultValues = DEFAULT_CONFIG_VALUES[module]
     const allKeys = Object.keys(defaultValues) as ConfigKey[]
-    const updates: Promise<configModel>[] = []
+    const entries: Array<{ key: ConfigKey, value: string }> = []
     for (const key of allKeys) {
       if (!existingKeys.has(key)) {
-        updates.push(updateConfigValue(key, module, defaultValues[key as keyof typeof defaultValues]))
+        entries.push({ key, value: defaultValues[key as keyof typeof defaultValues] })
       }
     }
-    if (updates.length > 0) {
-      await Promise.all(updates)
+    if (entries.length > 0) {
+      await updateModuleConfigValues(module, entries)
     }
   }
 
@@ -265,21 +256,21 @@ async function cleanInvalidConfigs(): Promise<void> {
  */
 async function initUserConfig() {
   const config = await getUserModuleConfig()
-  const updates: Promise<configModel>[] = []
+  const entries: Array<{ key: ConfigKeyUser, value: string }> = []
   const defaultUsername = DEFAULT_CONFIG_VALUES[ConfigModule.USER][ConfigKeyUser.USERNAME]
   const defaultPassword = DEFAULT_CONFIG_VALUES[ConfigModule.USER][ConfigKeyUser.PASSWORD]
 
   // 认证信息为空，设置默认的用户名和密码（新装环境）
   if (!isNotEmpty(config.username)) {
-    updates.push(updateUserConfigValue(ConfigKeyUser.USERNAME, defaultUsername))
+    entries.push({ key: ConfigKeyUser.USERNAME, value: defaultUsername })
     config.username = defaultUsername
   }
   if (!isNotEmpty(config.password)) {
-    updates.push(updateUserConfigValue(ConfigKeyUser.PASSWORD, defaultPassword))
+    entries.push({ key: ConfigKeyUser.PASSWORD, value: defaultPassword })
     config.password = defaultPassword
   }
-  if (updates.length > 0) {
-    await Promise.all(updates)
+  if (entries.length > 0) {
+    await updateUserConfigValues(entries)
   }
 }
 
@@ -353,14 +344,18 @@ async function _migrateSystemConfigKeys(): Promise<void> {
       newConfigMap.set(c.key, c)
   }
   // 值不同时用旧值覆盖新记录，然后批量删除所有旧记录
+  const entries: Array<{ key: ConfigKeySystem, value: string }> = []
   const idsToDelete: number[] = []
   for (const old of oldConfigs) {
     const newKey = LEGACY_SYSTEM_KEYS[old.key]
     const newRecord = newKey ? newConfigMap.get(newKey) : undefined
     if (newRecord && newRecord.value !== old.value) {
-      await db.config.$updateById({ id: newRecord.id, data: { value: old.value } })
+      entries.push({ key: newKey, value: old.value })
     }
     idsToDelete.push(old.id)
+  }
+  if (entries.length > 0) {
+    await updateSystemConfigValues(entries)
   }
   await db.config.$deleteById(idsToDelete)
 }

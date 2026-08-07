@@ -1,8 +1,7 @@
 import type { ConfigDataUser } from '../type/config'
 import { ConfigKeyUser, DEFAULT_USER_CONFIG_VALUES } from '../type/config'
-import { updateUserConfigValue } from './index'
+import { updateUserConfigValues } from './index'
 import { isNotEmpty } from '../../utils'
-import type { configModel } from '../../db'
 import CryptoJS from 'crypto-js'
 
 const HASH_PREFIX = 'pbkdf2:'
@@ -70,14 +69,16 @@ export function verifyPassword(plaintext: string, stored: string): { valid: bool
  * 保存用户登录凭证
  */
 export async function saveUserCredentials(config: Partial<ConfigDataUser>) {
-  const updates: Promise<configModel>[] = []
+  const entries: Array<{ key: ConfigKeyUser, value: string }> = []
   if (isNotEmpty(config.username)) {
-    updates.push(updateUserConfigValue(ConfigKeyUser.USERNAME, config.username as string))
+    entries.push({ key: ConfigKeyUser.USERNAME, value: config.username as string })
   }
   if (isNotEmpty(config.password)) {
-    updates.push(updateUserConfigValue(ConfigKeyUser.PASSWORD, hashPassword(config.password as string)))
+    entries.push({ key: ConfigKeyUser.PASSWORD, value: hashPassword(config.password as string) })
   }
-  await Promise.all(updates)
+  if (entries.length > 0) {
+    await updateUserConfigValues(entries)
+  }
 }
 
 /**

@@ -2,8 +2,8 @@ import type { Express, Request, Response } from 'express'
 import express from 'express'
 import { API_STATUS_CODE } from '../../utils/httpUtil'
 import { validateRequestParams } from '../../utils'
-import { getCliModuleConfig, getSystemModuleConfig, updateConfigValue } from '../../core/config'
-import { ConfigKeyCli, ConfigKeySystem, ConfigModule } from '../../core/type/config'
+import { getCliModuleConfig, getSystemModuleConfig, updateCliConfigValues, updateSystemConfigValues } from '../../core/config'
+import { ConfigKeyCli, ConfigKeySystem } from '../../core/type/config'
 import { generateCliConfigSh } from '../../core/config/cli'
 import { applySystemTimezone, depSetSource } from '../../core/config/system'
 import { registerCleanupCron } from '../../core/cron/cleanup'
@@ -36,7 +36,7 @@ API.get('/cli', async (_request: Request, response: Response) => {
  */
 API.post('/cli', async (request: Request, response: Response) => {
   try {
-    validateRequestParams(request, {
+    const params = validateRequestParams(request, {
       body: [
         ['REMOVE_LOG_DAYS_AGO', [false, 'string', true]],
         ['ENABLE_UPDATE_EXTRA', [false, 'string', true]],
@@ -52,20 +52,20 @@ API.post('/cli', async (request: Request, response: Response) => {
         ['DEFAULT_TS_RUNTIME', [false, 'string', true]],
         ['ENABLE_PYTHON_UV', [false, 'string', true]],
       ] as const,
-    })
-    const body = request.body as Partial<Record<ConfigKeyCli, string>>
+    }, true)
+    const body = params.body
     const validKeys = new Set(Object.values(ConfigKeyCli))
-    const updates: Promise<any>[] = []
+    const updates: Array<{ key: ConfigKeyCli, value: string }> = []
     for (const [key, value] of Object.entries(body)) {
       if (!validKeys.has(key as ConfigKeyCli)) {
         return response.send(API_STATUS_CODE.fail(`无效的配置键: ${key}`))
       }
-      updates.push(updateConfigValue(key as ConfigKeyCli, ConfigModule.CLI, value as string))
+      updates.push({ key: key as ConfigKeyCli, value })
     }
     if (updates.length === 0) {
       return response.send(API_STATUS_CODE.fail('没有可更新的配置项'))
     }
-    await Promise.all(updates)
+    await updateCliConfigValues(updates)
     await generateCliConfigSh()
     response.send(API_STATUS_CODE.ok())
   }
@@ -92,7 +92,7 @@ API.get('/system', async (_request: Request, response: Response) => {
  */
 API.post('/system', async (request: Request, response: Response) => {
   try {
-    validateRequestParams(request, {
+    const params = validateRequestParams(request, {
       body: [
         ['timezone', [false, 'string']],
         ['npmRegistry', [false, 'string', true]],
@@ -105,23 +105,23 @@ API.post('/system', async (request: Request, response: Response) => {
         ['cleanupCronExpression', [false, 'string', true]],
         ['cleanupCronEnabled', [false, 'string', true]],
       ] as const,
-    })
-    const body = request.body as Record<string, string>
+    }, true)
+    const body = params.body
     const validKeys = new Set(Object.values(ConfigKeySystem))
-    const updates: Promise<any>[] = []
+    const updates: Array<{ key: ConfigKeySystem, value: string }> = []
     const sideEffects: Array<{ key: ConfigKeySystem, value: string }> = []
     for (const [param, value] of Object.entries(body)) {
       if (!validKeys.has(param as ConfigKeySystem)) {
         return response.send(API_STATUS_CODE.fail(`无效的配置键: ${param}`))
       }
       const configKey = param as ConfigKeySystem
-      updates.push(updateConfigValue(configKey, ConfigModule.SYSTEM, value))
+      updates.push({ key: configKey, value })
       sideEffects.push({ key: configKey, value })
     }
     if (updates.length === 0) {
       return response.send(API_STATUS_CODE.fail('没有可更新的配置项'))
     }
-    await Promise.all(updates)
+    await updateSystemConfigValues(updates)
     for (const { key, value } of sideEffects) {
       if (key === ConfigKeySystem.TIMEZONE && value) {
         applySystemTimezone(value)

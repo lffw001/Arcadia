@@ -1,6 +1,6 @@
 import type { Buffer } from 'node:buffer'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { getConfigValue, updateConfigValue } from '../config'
+import { getConfigValue, updateRuntimeConfigValue, updateRuntimeConfigValues } from '../config'
 import { socketCommon } from '../../server/socketCommon'
 import { APP_DIR_PATH, APP_FILE_PATH } from '../type'
 import { ConfigKeyRuntime, ConfigModule } from '../type/config'
@@ -51,7 +51,7 @@ function isProcessAlive(pid: number): boolean {
 
 async function clearUpgradeHook(): Promise<void> {
   await clearMarker()
-  await updateConfigValue(ConfigKeyRuntime.UPDATE_UPGRADE_PENDING, ConfigModule.RUNTIME, 'false')
+  await updateRuntimeConfigValue(ConfigKeyRuntime.UPDATE_UPGRADE_PENDING, 'false')
 }
 
 async function writeMarker(marker: UpgradeMarker): Promise<void> {
@@ -103,7 +103,7 @@ export async function startUpgrade(): Promise<void> {
       throw new Error('当前没有可更新的版本，请重新检查更新后再试')
 
     const marker: UpgradeMarker = { targetCommit: pendingCommit, versionTag: pendingTag || null, branch, startedAt: Date.now() }
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_UPGRADE_PENDING, ConfigModule.RUNTIME, 'true')
+    await updateRuntimeConfigValue(ConfigKeyRuntime.UPDATE_UPGRADE_PENDING, 'true')
     runUpgradeProcess(marker)
   }
   catch (e: any) {
@@ -184,14 +184,19 @@ async function finalizeUpgradeOutcome(marker: UpgradeMarker): Promise<{ success:
   const newHead = await updateCore.getCommit('HEAD')
 
   if (success) {
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT, ConfigModule.RUNTIME, '')
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_CHECK_LAST_AT, ConfigModule.RUNTIME, String(Date.now()))
+    await updateRuntimeConfigValues([
+      { key: ConfigKeyRuntime.UPDATE_PENDING_COMMIT, value: '' },
+      { key: ConfigKeyRuntime.UPDATE_CHECK_LAST_AT, value: String(Date.now()) },
+    ])
     // 更新后重新从本地获取当前版本号
     await updateCore.refreshVersionTagCache()
+    const entries: Array<{ key: ConfigKeyRuntime, value: string }> = [
+      { key: ConfigKeyRuntime.UPDATE_PENDING_TAG, value: '' },
+      { key: ConfigKeyRuntime.UPDATE_NOTIFIED, value: '' },
+    ]
     if (newHead)
-      await updateConfigValue(ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, ConfigModule.RUNTIME, newHead)
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_TAG, ConfigModule.RUNTIME, '')
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME, '')
+      entries.push({ key: ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, value: newHead })
+    await updateRuntimeConfigValues(entries)
   }
 
   await clearUpgradeHook()

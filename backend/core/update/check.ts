@@ -1,7 +1,8 @@
 import {
   getConfigValue,
   getRuntimeModuleConfigReadonly,
-  updateConfigValue,
+  updateRuntimeConfigValue,
+  updateRuntimeConfigValues,
 } from '../config'
 import { sendMessage } from '../message'
 import { socketCommon } from '../../server/socketCommon'
@@ -113,8 +114,10 @@ async function runCheckAndPersist(source: UpdateCheckSource): Promise<UpdateChec
 
   if (result.target) {
     const notified = await getConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME)
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT, ConfigModule.RUNTIME, result.target.fullCommit)
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_TAG, ConfigModule.RUNTIME, result.target.versionTag ?? '')
+    await updateRuntimeConfigValues([
+      { key: ConfigKeyRuntime.UPDATE_PENDING_COMMIT, value: result.target.fullCommit },
+      { key: ConfigKeyRuntime.UPDATE_PENDING_TAG, value: result.target.versionTag ?? '' },
+    ])
 
     // 仅被动检测且未提醒过时推送消息；推送后标记，更新成功后清除
     if (source === 'auto' && notified !== 'true') {
@@ -125,22 +128,26 @@ async function runCheckAndPersist(source: UpdateCheckSource): Promise<UpdateChec
         category: 'system',
         type: 'info',
       })
-      await updateConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME, 'true')
+      await updateRuntimeConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, 'true')
     }
   }
   else if (result.status === UpdateCheckStatus.UP_TO_DATE) {
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT, ConfigModule.RUNTIME, '')
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_TAG, ConfigModule.RUNTIME, '')
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME, '')
+    await updateRuntimeConfigValues([
+      { key: ConfigKeyRuntime.UPDATE_PENDING_COMMIT, value: '' },
+      { key: ConfigKeyRuntime.UPDATE_PENDING_TAG, value: '' },
+      { key: ConfigKeyRuntime.UPDATE_NOTIFIED, value: '' },
+    ])
   }
 
   // 成功检测刷新检测时间并清除失败标记；失败记录失败时间，停止被动重试
   if (result.status !== UpdateCheckStatus.ERROR) {
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_CHECK_LAST_AT, ConfigModule.RUNTIME, String(Date.now()))
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_CHECK_FAILED_AT, ConfigModule.RUNTIME, '')
+    await updateRuntimeConfigValues([
+      { key: ConfigKeyRuntime.UPDATE_CHECK_LAST_AT, value: String(Date.now()) },
+      { key: ConfigKeyRuntime.UPDATE_CHECK_FAILED_AT, value: '' },
+    ])
   }
   else {
-    await updateConfigValue(ConfigKeyRuntime.UPDATE_CHECK_FAILED_AT, ConfigModule.RUNTIME, String(Date.now()))
+    await updateRuntimeConfigValue(ConfigKeyRuntime.UPDATE_CHECK_FAILED_AT, String(Date.now()))
   }
 
   socketCommon.emit('update:refresh', {})
