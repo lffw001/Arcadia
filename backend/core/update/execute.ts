@@ -113,9 +113,6 @@ export async function startUpgrade(): Promise<void> {
 }
 
 function runUpgradeProcess(marker: UpgradeMarker): void {
-  const displayVersionTag = marker.versionTag
-  logger.info(`[版本更新] 开始更新（目标版本标签：${displayVersionTag ?? '未知'}）`)
-
   // detached 使子进程自成进程组，超时后可终止整条调用链；来源标识让 shell 钩子跳过回调
   const child = updateCore.spawnUpgrade({ ...process.env, ARCADE_UPDATE_SOURCE: 'backend' })
 
@@ -129,7 +126,7 @@ function runUpgradeProcess(marker: UpgradeMarker): void {
   const overallTimeout = setTimeout(() => {
     if (finished || !childPid)
       return
-    logger.error('[版本更新] 更新超时，正在终止整个进程组...')
+    logger.error('[版本更新] 更新超时')
     process.kill(-childPid, 'SIGTERM')
     sigkillTimer = setTimeout(() => {
       if (!finished && childPid)
@@ -137,9 +134,10 @@ function runUpgradeProcess(marker: UpgradeMarker): void {
     }, updateConstants.UPGRADE_SIGKILL_GRACE_MS)
   }, updateConstants.UPGRADE_SCRIPT_TIMEOUT_MS)
 
-  // 脚本输出（含原生 git 报错）写入后端日志
-  child.stdout.on('data', (data: Buffer) => logger.info(`[更新日志] ${data.toString('utf-8').trimEnd()}`))
-  child.stderr.on('data', (data: Buffer) => logger.warn(`[更新日志] ${data.toString('utf-8').trimEnd()}`))
+  // 常规输出不记录日志
+  child.stdout.resume()
+  // 错误输出写入后端日志，便于查看 git 报错
+  child.stderr.on('data', (data: Buffer) => logger.error(`[版本更新] ${data.toString('utf-8').trimEnd()}`))
 
   child.on('close', async () => {
     finished = true
