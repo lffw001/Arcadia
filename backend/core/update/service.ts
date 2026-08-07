@@ -54,6 +54,7 @@ export async function refreshVersionStateAfterUpgrade(): Promise<void> {
   if (pendingCommit && localHead && await updateCore.isCommitIncluded(pendingCommit, localHead)) {
     await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT, ConfigModule.RUNTIME, '')
     await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_TAG, ConfigModule.RUNTIME, '')
+    await updateConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME, '')
   }
 
   await resolveCurrentVersionTag()

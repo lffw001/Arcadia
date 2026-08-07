@@ -1,5 +1,5 @@
 import {
-  getRuntimeConfigValue,
+  getConfigValue,
   getRuntimeModuleConfigReadonly,
   updateConfigValue,
 } from '../config'
@@ -78,7 +78,7 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
     latestRelease = await fetchLatestRelease()
   }
   catch {}
-  const targetVersionTag = latestRelease?.tag_name ?? null
+  const targetVersionTag = latestRelease?.tag_name ? latestRelease.tag_name.replace(/^v/, '') : null
   // 更新说明始终取最新正式 Release 正文，不做版本匹配
   const changelog = latestRelease?.body ?? null
   const target = { versionTag: targetVersionTag, commit: remoteHead.slice(0, 7), fullCommit: remoteHead, changelog }
@@ -112,12 +112,12 @@ async function runCheckAndPersist(source: UpdateCheckSource): Promise<UpdateChec
   const result = await checkForUpdate()
 
   if (result.target) {
-    const previousCommit = await getRuntimeConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT)
+    const notified = await getConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME)
     await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT, ConfigModule.RUNTIME, result.target.fullCommit)
     await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_TAG, ConfigModule.RUNTIME, result.target.versionTag ?? '')
 
-    // 仅被动检测且目标变化时推送消息
-    if (source === 'auto' && previousCommit !== result.target.fullCommit) {
+    // 仅被动检测且未提醒过时推送消息；推送后标记，更新成功后清除
+    if (source === 'auto' && notified !== 'true') {
       const content = result.target.changelog?.trim() || '检测到新版本，请前往版本更新页面查看更多细节'
       await sendMessage({
         title: '发现新版本',
@@ -125,16 +125,23 @@ async function runCheckAndPersist(source: UpdateCheckSource): Promise<UpdateChec
         category: 'system',
         type: 'info',
       })
+      await updateConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME, 'true')
     }
   }
   else if (result.status === UpdateCheckStatus.UP_TO_DATE) {
     await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_COMMIT, ConfigModule.RUNTIME, '')
     await updateConfigValue(ConfigKeyRuntime.UPDATE_PENDING_TAG, ConfigModule.RUNTIME, '')
+    await updateConfigValue(ConfigKeyRuntime.UPDATE_NOTIFIED, ConfigModule.RUNTIME, '')
   }
 
-  // 仅成功检测时刷新检测时间
-  if (result.status !== UpdateCheckStatus.ERROR)
+  // 成功检测刷新检测时间并清除失败标记；失败记录失败时间，停止被动重试
+  if (result.status !== UpdateCheckStatus.ERROR) {
     await updateConfigValue(ConfigKeyRuntime.UPDATE_CHECK_LAST_AT, ConfigModule.RUNTIME, String(Date.now()))
+    await updateConfigValue(ConfigKeyRuntime.UPDATE_CHECK_FAILED_AT, ConfigModule.RUNTIME, '')
+  }
+  else {
+    await updateConfigValue(ConfigKeyRuntime.UPDATE_CHECK_FAILED_AT, ConfigModule.RUNTIME, String(Date.now()))
+  }
 
   socketCommon.emit('update:refresh', {})
   return result
@@ -150,6 +157,9 @@ export async function triggerAutoCheckIfNeeded(): Promise<void> {
   if (runtime[ConfigKeyRuntime.UPDATE_UPGRADE_PENDING] === 'true')
     return
   if (runtime[ConfigKeyRuntime.UPDATE_PENDING_COMMIT])
+    return
+  // 检测失败后不再被动重试（离线环境等场景），手动检测成功后自动恢复
+  if (runtime[ConfigKeyRuntime.UPDATE_CHECK_FAILED_AT])
     return
   const lastAt = Number(runtime[ConfigKeyRuntime.UPDATE_CHECK_LAST_AT]) || 0
   if (lastAt > 0 && Date.now() - lastAt < updateConstants.UPDATE_CHECK_INTERVAL_MS)

@@ -38,7 +38,7 @@ api.get('/check', async (_request, response) => {
 api.post('/apply', async (_request, response) => {
   try {
     await startUpgrade()
-    response.send(API_STATUS_CODE.ok('已开始更新，更新结果将通过消息中心通知'))
+    response.send(API_STATUS_CODE.ok())
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || e))

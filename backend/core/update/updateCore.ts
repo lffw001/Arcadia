@@ -125,7 +125,7 @@ export class UpdateCore {
    * @description 后台运行且自成进程组，供超时终止整条调用链
    */
   spawnUpgrade(env: NodeJS.ProcessEnv): ChildProcessWithoutNullStreams {
-    return spawn('bash', [APP_FILE_PATH.UPDATE_SH, ShellCommand.Upgrade, APP_DIR_PATH.ROOT, APP_SOURCE_DIR], {
+    return spawn('bash', [APP_FILE_PATH.UPDATE_SH, ShellCommand.Upgrade], {
       cwd: APP_DIR_PATH.ROOT,
       env,
       detached: true,
@@ -143,10 +143,11 @@ export class UpdateCore {
   /**
    * 获取当前版本号标签
    *
-   * @description 按分支判定：dev 分支固定 Dev，生产分支取最近 tag
+   * @description 按分支判定：dev 分支固定 Dev，生产分支取最近 tag，并去除开头的 v 前缀
    */
-  getCurrentVersionTag(): Promise<string | null> {
-    return this.runScript([ShellCommand.CurrentVersion, APP_SOURCE_DIR])
+  async getCurrentVersionTag(): Promise<string | null> {
+    const tag = await this.runScript([ShellCommand.CurrentVersion, APP_SOURCE_DIR])
+    return tag ? tag.replace(/^v/, '') : null
   }
 
   /**

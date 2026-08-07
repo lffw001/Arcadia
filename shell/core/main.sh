@@ -200,6 +200,7 @@ function print_version() {
         tag="Dev"
     elif [[ "${branch}" == "main" ]]; then
         tag="$(git describe --tags --abbrev=0 HEAD 2>/dev/null)"
+        tag="${tag#v}"
     fi
     local commit="$(git rev-parse --short HEAD 2>/dev/null)"
     echo -e "Arcadia ${tag:-unknown} (${commit:-unknown})"

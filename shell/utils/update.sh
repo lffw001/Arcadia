@@ -6,8 +6,7 @@
 function update_current_branch() {
     local repo_dir="$1"
     cd "${repo_dir}"
-    local branch
-    branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    local branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
     if [[ -z "${branch}" || "${branch}" == "HEAD" ]]; then
         echo "[update.sh] ERROR: detached HEAD, cannot resolve tracked branch" >&2
         return 1
@@ -19,8 +18,7 @@ function update_current_branch() {
 function update_current_version() {
     local repo_dir="$1"
     cd "${repo_dir}"
-    local branch
-    branch="$(update_current_branch "${repo_dir}")"
+    local branch="$(update_current_branch "${repo_dir}")"
     case "${branch}" in
     dev)
         echo "Dev"
@@ -63,10 +61,7 @@ function update_fetch() {
 
 # 执行现有升级命令（更新项目源码）
 function update_upgrade() {
-    local root_dir="$1"
-    local src_dir="$2"
-    cd "${root_dir}"
-    bash "${src_dir}/shell/main.sh" upgrade
+    arcadia upgrade
 }
 
 # 用法：
@@ -75,7 +70,7 @@ function update_upgrade() {
 #   bash update.sh resolve-commit  <repo_dir> <revision>
 #   bash update.sh is-ancestor     <repo_dir> <ancestor> <revision>
 #   bash update.sh fetch           <repo_dir> <branch>
-#   bash update.sh upgrade         <root_dir> <src_dir>
+#   bash update.sh upgrade
 
 CMD="${1}"
 shift 2>/dev/null
@@ -97,7 +92,7 @@ fetch)
     update_fetch "$@"
     ;;
 upgrade)
-    update_upgrade "$@"
+    update_upgrade
     ;;
 *)
     echo "[update.sh] ERROR: unsupported command: ${CMD}" >&2
