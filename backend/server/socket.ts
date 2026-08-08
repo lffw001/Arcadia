@@ -58,6 +58,12 @@ export function connectionLimitMiddleware(socket: Socket, next: (err?: Error) =>
 
 export function initSocketServer(server: HttpServer) {
   const io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'HEAD'],
+      allowedHeaders: ['Authorization'],
+      credentials: true,
+    },
     path: '/api/ws',
     maxHttpBufferSize: MAX_HTTP_BUFFER_SIZE,
   })
