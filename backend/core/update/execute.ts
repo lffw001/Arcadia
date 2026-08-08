@@ -72,6 +72,25 @@ async function clearMarker(): Promise<void> {
   await rm(APP_FILE_PATH.UPDATE_MARKER, { force: true })
 }
 
+async function clearUpgradeLog(): Promise<void> {
+  await rm(APP_FILE_PATH.UPDATE_RUN_LOG, { force: true })
+}
+
+/**
+ * 读取更新脚本运行日志并写入后端日志
+ *
+ * @description 脚本输出暂存于临时文件，仅在更新失败时读取打印，随后清理
+ */
+async function dumpUpgradeLog(): Promise<void> {
+  try {
+    const content = await readFile(APP_FILE_PATH.UPDATE_RUN_LOG, 'utf8')
+    if (content.trim())
+      logger.error(`[版本更新] 更新脚本输出：\n${content.trimEnd()}`)
+  }
+  catch {}
+  await rm(APP_FILE_PATH.UPDATE_RUN_LOG, { force: true })
+}
+
 /**
  * 启动后台更新
  *
@@ -113,46 +132,95 @@ export async function startUpgrade(): Promise<void> {
 }
 
 function runUpgradeProcess(marker: UpgradeMarker): void {
-  // detached 使子进程自成进程组，超时后可终止整条调用链；来源标识让 shell 钩子跳过回调
+  // launcher 以独立会话拉起真实升级脚本后立即退出，使脚本脱离后端进程树，
+  // 避免更新流程重启后端服务（pm2 tree-kill）时被连带终止
   const child = updateCore.spawnUpgrade({ ...process.env, ARCADE_UPDATE_SOURCE: 'backend' })
 
-  const childPid = child.pid
-  // 拿到 pid 后才落标记，供重启后的存活探测使用
-  writeMarker({ ...marker, pid: childPid }).catch(() => {})
-  socketCommon.emit('update:refresh', {})
+  let realPid: number | null = null
+  let stdout = ''
   let finished = false
+  let overallTimeout: NodeJS.Timeout | undefined
   let sigkillTimer: NodeJS.Timeout | undefined
+  let watchTimer: ReturnType<typeof setInterval> | null = null
 
-  const overallTimeout = setTimeout(() => {
-    if (finished || !childPid)
+  // 先落标记（无 pid），拿到真实脚本 PID 后补充，供重启后的存活探测使用
+  writeMarker(marker).catch(() => {})
+  socketCommon.emit('update:refresh', {})
+
+  const cleanup = () => {
+    finished = true
+    if (overallTimeout)
+      clearTimeout(overallTimeout)
+    if (sigkillTimer)
+      clearTimeout(sigkillTimer)
+    if (watchTimer)
+      clearInterval(watchTimer)
+  }
+
+  // 解析 launcher 输出的真实脚本 PID
+  child.stdout.on('data', (data: Buffer) => {
+    stdout += data.toString('utf8')
+    const pid = Number(stdout.trim())
+    if (Number.isInteger(pid) && pid > 0) {
+      realPid = pid
+      writeMarker({ ...marker, pid }).catch(() => {})
+    }
+  })
+
+  overallTimeout = setTimeout(() => {
+    if (finished)
       return
     logger.error('[版本更新] 更新超时')
-    process.kill(-childPid, 'SIGTERM')
-    sigkillTimer = setTimeout(() => {
-      if (!finished && childPid)
-        process.kill(-childPid, 'SIGKILL')
-    }, updateConstants.UPGRADE_SIGKILL_GRACE_MS)
+    const targetPid = realPid ?? child.pid
+    if (targetPid) {
+      try {
+        process.kill(-targetPid, 'SIGTERM')
+      }
+      catch {}
+      sigkillTimer = setTimeout(() => {
+        if (!finished && targetPid) {
+          try {
+            process.kill(-targetPid, 'SIGKILL')
+          }
+          catch {}
+        }
+      }, updateConstants.UPGRADE_SIGKILL_GRACE_MS)
+    }
   }, updateConstants.UPGRADE_SCRIPT_TIMEOUT_MS)
 
-  // 常规输出不记录日志
-  child.stdout.resume()
-  // 错误输出写入后端日志，便于查看 git 报错
   child.stderr.on('data', (data: Buffer) => logger.error(`[版本更新] ${data.toString('utf-8').trimEnd()}`))
 
   child.on('close', async () => {
-    finished = true
-    clearTimeout(overallTimeout)
-    if (sigkillTimer)
-      clearTimeout(sigkillTimer)
-    updating = false
-    await finalizeUpgradeOutcome(marker)
+    if (finished)
+      return
+    if (!realPid) {
+      // 未获取到真实脚本 PID，视为启动失败
+      cleanup()
+      updating = false
+      logger.error('[版本更新] 更新脚本启动失败')
+      await dumpUpgradeLog()
+      await clearUpgradeHook()
+      socketCommon.emit('update:refresh', {})
+      return
+    }
+    // launcher 已退出，改为轮询真实脚本存活状态
+    const pid = realPid
+    watchTimer = setInterval(async () => {
+      if (finished)
+        return
+      if (!isProcessAlive(pid)) {
+        cleanup()
+        updating = false
+        await finalizeUpgradeOutcome(marker)
+      }
+    }, 2000)
   })
 
   child.on('error', async (err) => {
-    finished = true
-    clearTimeout(overallTimeout)
+    cleanup()
     updating = false
     logger.error('[版本更新] 启动更新脚本失败', err.message || err)
+    await dumpUpgradeLog()
     await clearUpgradeHook()
     socketCommon.emit('update:refresh', {})
   })
@@ -197,6 +265,10 @@ async function finalizeUpgradeOutcome(marker: UpgradeMarker): Promise<{ success:
     if (newHead)
       entries.push({ key: ConfigKeyRuntime.UPDATE_CURRENT_COMMIT, value: newHead })
     await updateRuntimeConfigValues(entries)
+    await clearUpgradeLog()
+  }
+  else {
+    await dumpUpgradeLog()
   }
 
   await clearUpgradeHook()
@@ -217,6 +289,7 @@ export async function restoreUpgradeState(): Promise<void> {
   const stale = !marker || !Number.isFinite(marker.startedAt) || Date.now() - marker.startedAt >= updateConstants.UPGRADE_SCRIPT_TIMEOUT_MS
   if (stale) {
     await clearUpgradeHook()
+    await clearUpgradeLog()
     return
   }
   if (await isTargetReached(marker)) {
@@ -226,6 +299,7 @@ export async function restoreUpgradeState(): Promise<void> {
   // 进程已退出且未到达目标：清理残留并通知失败；否则等待脚本结束或超时
   if (marker.pid && !isProcessAlive(marker.pid)) {
     await clearUpgradeHook()
+    await dumpUpgradeLog()
     socketCommon.emit('update:refresh', {})
   }
 }

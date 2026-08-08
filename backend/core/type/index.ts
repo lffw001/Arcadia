@@ -13,6 +13,7 @@ export enum APP_FILE_NAME {
   SYNC = 'sync.yml',
   BOT = 'bot.json',
   UPDATE_MARKER = 'update-marker.json',
+  UPDATE_RUN_LOG = 'update-run.log',
 }
 
 export enum APP_DIR_TYPE {
@@ -53,6 +54,7 @@ export const APP_FILE_PATH = {
   RESOLVE_SCRIPT: path.join(APP_DIR_PATH.SHELL, 'utils/resolve.sh'), // resolve.sh 文件路径
   UPDATE_SH: path.join(APP_DIR_PATH.SHELL, 'utils/update.sh'), // 更新脚本文件路径
   UPDATE_MARKER: path.join(APP_DIR_PATH.TMP, APP_FILE_NAME.UPDATE_MARKER), // 更新进度标记文件路径
+  UPDATE_RUN_LOG: path.join(APP_DIR_PATH.TMP, APP_FILE_NAME.UPDATE_RUN_LOG), // 更新脚本运行日志临时文件路径
 }
 
 export enum APP_FILE_TYPES {

@@ -122,10 +122,11 @@ export class UpdateCore {
   /**
    * 启动升级脚本
    *
-   * @description 后台运行且自成进程组，供超时终止整条调用链
+   * @description 以独立会话后台运行并重定向输出，避免更新流程重启后端服务时被连带终止
    */
   spawnUpgrade(env: NodeJS.ProcessEnv): ChildProcessWithoutNullStreams {
-    return spawn('bash', [APP_FILE_PATH.UPDATE_SH, ShellCommand.Upgrade], {
+    const command = `setsid bash '${APP_FILE_PATH.UPDATE_SH}' upgrade >'${APP_FILE_PATH.UPDATE_RUN_LOG}' 2>&1 & echo $!`
+    return spawn('bash', ['-c', command], {
       cwd: APP_DIR_PATH.ROOT,
       env,
       detached: true,
