@@ -343,7 +343,6 @@ function run_script_core() {
         [ $? -eq 0 ] && operation_title="重启" || operation_title="启动"
         # 删除原有
         pm2 stop "${RUN_OPTION_DAEMON_NAME:-$FileName}" >/dev/null 2>&1
-        pm2 flush "${RUN_OPTION_DAEMON_NAME:-$FileName}" >/dev/null 2>&1
         pm2 delete "${RUN_OPTION_DAEMON_NAME:-$FileName}" >/dev/null 2>&1
         # 启动（此处特殊，需要替换命令中的日志标记）
         run_cmd="${run_cmd//<LogFilePath>/${LogFilePath}}"
