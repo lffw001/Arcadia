@@ -1,6 +1,5 @@
 import type { ErrorRequestHandler, Express, Request, RequestHandler, Response, Router } from 'express'
 import express from 'express'
-import cors from 'cors'
 import compression from 'compression'
 import { expressjwt } from 'express-jwt'
 import bodyParser from 'body-parser'
@@ -72,14 +71,6 @@ export function registerApp(apiAuthentication: RequestHandler) {
     return compression.filter(req, res)
   }
 
-  app.use(
-    cors({
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      credentials: true,
-    }),
-  )
   app.use(
     bodyParser.json({
       limit: '50mb',

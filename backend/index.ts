@@ -9,7 +9,7 @@ import { initConfig } from './core/config'
 import { restoreUpgradeState } from './core/update'
 import { initTokenCache as initOpenApiAccessKeyCache } from './api/openapi/openApiCore'
 import { initLog } from './core/log'
-import { initTerminalServer } from './server/terminal'
+import { cleanupTerminalSessions, initTerminalServer } from './server/terminal'
 import { initDaemonLogServer } from './server/daemonLog'
 import { initDepManagerSystem } from './core/dep'
 
@@ -49,6 +49,14 @@ async function startServer() {
 
   // 初始化守护任务日志实时推送命名空间
   initDaemonLogServer(io)
+
+  // 退出时清理残留 PTY 会话
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => {
+      cleanupTerminalSessions()
+      process.exit(0)
+    })
+  }
 
   // 恢复未完成的更新状态
   await restoreUpgradeState()

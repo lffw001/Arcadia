@@ -4,7 +4,7 @@ import { API_STATUS_CODE, getClientIP, ip2AddressCached, parseUserAgent } from '
 import { logger } from '../../utils/logger'
 import jwt from 'jsonwebtoken'
 import { randomString } from '../../utils'
-import { getRuntimeConfigValue, getUserModuleConfig, rotateJwtSecret, updateUserConfigValue } from '../../core/config'
+import { getJwtSecretSync, getUserModuleConfig, rotateJwtSecret, updateUserConfigValue } from '../../core/config'
 import { hashPassword, resetUserCredentials, saveUserCredentials, verifyPassword } from '../../core/config/user'
 import {
   disableTOTP,
@@ -15,7 +15,7 @@ import {
   saveTOTPSecret,
   verifyTOTPCode,
 } from '../../core/config/totp'
-import { ConfigKeyRuntime, ConfigKeyUser, DEFAULT_USER_CONFIG_VALUES } from '../../core/type/config'
+import { ConfigKeyUser, DEFAULT_USER_CONFIG_VALUES } from '../../core/type/config'
 import {
   getAuthErrorCount,
   getAuthLimitRemainingTime,
@@ -132,7 +132,7 @@ async function completeLogin(username: string, password: string, request: Reques
   }).catch(() => {})
 
   // 生成 JWT Token
-  const jwtSecret = await getRuntimeConfigValue(ConfigKeyRuntime.JWT_SECRET)
+  const jwtSecret = getJwtSecretSync()
   result.token = jwt.sign({ username }, jwtSecret, { expiresIn: 3600 * 24 * 3 })
 
   return result

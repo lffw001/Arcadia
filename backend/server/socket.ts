@@ -1,6 +1,7 @@
 import type { Request } from 'express'
 import type { Server as HttpServer } from 'node:http'
 import { Server } from 'socket.io'
+import type { Socket } from 'socket.io'
 import type { JwtPayload, VerifyCallback } from 'jsonwebtoken'
 import jwt from 'jsonwebtoken'
 import { getJwtSecretSync } from '../core/config'
@@ -14,45 +15,56 @@ declare module 'http' {
   }
 }
 
+const MAX_CONNECTIONS = 200
+const MAX_HTTP_BUFFER_SIZE = 256 * 1024
+
+let activeConnections = 0
+
 function getToken(req: Request) {
   if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
     return req.headers.authorization.split(' ')[1] as string
   }
-  else if (req.query && req.query.token) {
-    return req.query.token as string
-  }
   return undefined
+}
+
+export function socketAuthMiddleware(socket: Socket, next: (err?: Error) => void) {
+  const token = getToken(socket.request as Request)
+  if (!token) {
+    next(new Error('unauthorized'))
+    return
+  }
+  jwt.verify(token, getJwtSecretSync(), { algorithms: ['HS256'] }, ((err, decoded) => {
+    if (err) {
+      next(new Error('unauthorized'))
+    }
+    else {
+      socket.request.username = decoded
+      next()
+    }
+  }) as VerifyCallback)
+}
+
+export function connectionLimitMiddleware(socket: Socket, next: (err?: Error) => void) {
+  if (activeConnections >= MAX_CONNECTIONS) {
+    next(new Error('too many connections'))
+    return
+  }
+  activeConnections++
+  socket.on('disconnect', () => {
+    activeConnections--
+  })
+  next()
 }
 
 export function initSocketServer(server: HttpServer) {
   const io = new Server(server, {
-    cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
-      methods: ['GET', 'HEAD'],
-      allowedHeaders: ['Authorization'],
-      credentials: true,
-    },
     path: '/api/ws',
+    maxHttpBufferSize: MAX_HTTP_BUFFER_SIZE,
   })
 
   // Socket.IO 认证中间件
-  io.use((socket, next) => {
-    const token = getToken(socket.request as Request)
-    if (token) {
-      jwt.verify(token, getJwtSecretSync(), ((err, decoded) => {
-        if (err) {
-          next(new Error('unauthorized'))
-        }
-        else {
-          socket.request.username = decoded
-          next()
-        }
-      }) as VerifyCallback)
-    }
-    else {
-      next(new Error('unauthorized'))
-    }
-  })
+  io.use(socketAuthMiddleware)
+  io.use(connectionLimitMiddleware)
 
   io.on('connection', (_socket) => {
     // const user = socket.request.user

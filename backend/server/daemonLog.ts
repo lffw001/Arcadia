@@ -1,18 +1,23 @@
 import type { Server, Socket } from 'socket.io'
-import { closeSync, existsSync, openSync, readSync, statSync, watch } from 'node:fs'
+import { watch } from 'node:fs'
 import type { FSWatcher } from 'node:fs'
+import { open, stat } from 'node:fs/promises'
 import { Buffer } from 'node:buffer'
 import db from '../db'
 import { getDaemonLogFilePath } from '../core/daemon'
+import { connectionLimitMiddleware, socketAuthMiddleware } from './socket'
 
 // 单次推送最大字节数，超出时只读最新部分
 const MAX_EMIT_BYTES = 1024 * 1024 // 1 MB
+const FLUSH_INTERVAL_MS = 50
 
 interface LogWatchState {
   taskId: number
   filePath: string
   lastSize: number
   watcher: FSWatcher
+  timer: NodeJS.Timeout | null
+  flushing: boolean
 }
 
 const watchStates = new Map<string, LogWatchState>()
@@ -20,6 +25,9 @@ const watchStates = new Map<string, LogWatchState>()
 function cleanupWatch(socketId: string): void {
   const state = watchStates.get(socketId)
   if (state) {
+    if (state.timer) {
+      clearTimeout(state.timer)
+    }
     try {
       state.watcher.close()
     }
@@ -28,45 +36,86 @@ function cleanupWatch(socketId: string): void {
   }
 }
 
-function startWatching(socket: Socket, taskId: number, filePath: string): void {
+async function flushLog(state: LogWatchState, socket: Socket): Promise<void> {
+  if (state.flushing) {
+    return
+  }
+  state.flushing = true
+  try {
+    const fileStat = await stat(state.filePath)
+    if (!fileStat.isFile()) {
+      return
+    }
+    const newSize = fileStat.size
+    if (newSize > state.lastSize) {
+      const total = newSize - state.lastSize
+      const len = Math.min(total, MAX_EMIT_BYTES)
+      const offset = newSize - len
+      const buf = Buffer.alloc(len)
+      const fd = await open(state.filePath, 'r')
+      let bytesRead = 0
+      try {
+        bytesRead = (await fd.read(buf, 0, len, offset)).bytesRead
+        state.lastSize = newSize
+      }
+      finally {
+        await fd.close()
+      }
+      if (socket.connected && bytesRead > 0) {
+        socket.emit('daemon:log:data', buf.subarray(0, bytesRead).toString('utf-8'))
+      }
+    }
+    else if (newSize < state.lastSize) {
+      // 日志被裁剪，重置位置
+      state.lastSize = newSize
+    }
+  }
+  catch (err) {
+    // 文件被删除时重置位置，等待重新创建
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      state.lastSize = 0
+    }
+  }
+  finally {
+    state.flushing = false
+  }
+}
+
+function scheduleFlush(state: LogWatchState, socket: Socket): void {
+  if (state.timer) {
+    return
+  }
+  state.timer = setTimeout(() => {
+    state.timer = null
+    void flushLog(state, socket)
+  }, FLUSH_INTERVAL_MS)
+}
+
+async function startWatching(socket: Socket, taskId: number, filePath: string): Promise<void> {
   cleanupWatch(socket.id)
 
   let lastSize = 0
-  if (existsSync(filePath)) {
-    try {
-      lastSize = statSync(filePath).size
+  try {
+    const fileStat = await stat(filePath)
+    if (fileStat.isFile()) {
+      lastSize = fileStat.size
     }
-    catch {}
   }
+  catch {}
 
   let watcher: FSWatcher
+  let state: LogWatchState | undefined
   try {
     watcher = watch(filePath, { persistent: false }, (eventType) => {
-      if (eventType !== 'change')
+      if (eventType !== 'change') {
         return
-      try {
-        if (!existsSync(filePath)) {
-          lastSize = 0
-          return
-        }
-        const newSize = statSync(filePath).size
-        if (newSize > lastSize) {
-          const total = newSize - lastSize
-          const len = Math.min(total, MAX_EMIT_BYTES)
-          const offset = newSize - len
-          const buf = Buffer.alloc(len)
-          const fd = openSync(filePath, 'r')
-          readSync(fd, buf, 0, len, offset)
-          closeSync(fd)
-          lastSize = newSize
-          socket.emit('daemon:log:data', buf.toString('utf-8'))
-        }
-        else if (newSize < lastSize) {
-          // 日志被裁剪，重置位置
-          lastSize = newSize
-        }
       }
-      catch {}
+      if (state) {
+        scheduleFlush(state, socket)
+      }
+    })
+    watcher.on('error', () => {
+      cleanupWatch(socket.id)
     })
   }
   catch {
@@ -74,7 +123,8 @@ function startWatching(socket: Socket, taskId: number, filePath: string): void {
     return
   }
 
-  watchStates.set(socket.id, { taskId, filePath, lastSize, watcher })
+  state = { taskId, filePath, lastSize, watcher, timer: null, flushing: false }
+  watchStates.set(socket.id, state)
 }
 
 /**
@@ -83,14 +133,22 @@ function startWatching(socket: Socket, taskId: number, filePath: string): void {
 export function initDaemonLogServer(io: Server): void {
   const ns = io.of('/daemon-log')
 
+  ns.use(socketAuthMiddleware)
+  ns.use(connectionLimitMiddleware)
+
   ns.on('connection', (socket: Socket) => {
-    socket.on('daemon:log:subscribe', async ({ id }: { id: number }) => {
+    socket.on('daemon:log:subscribe', async (payload: unknown) => {
       try {
-        const task = await db.daemonTask.$getById(id)
-        if (!task || !task.log_name)
+        const id = typeof payload === 'object' && payload !== null ? (payload as { id?: unknown }).id : undefined
+        if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
           return
+        }
+        const task = await db.daemonTask.$getById(id)
+        if (!task || !task.log_name) {
+          return
+        }
         const filePath = getDaemonLogFilePath({ log_dir: task.log_dir, log_name: task.log_name })
-        startWatching(socket, id, filePath)
+        await startWatching(socket, id, filePath)
       }
       catch {}
     })
