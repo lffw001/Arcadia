@@ -426,9 +426,9 @@ function ddBotNotify(text, desp) {
             timeout,
         }
         if (DD_BOT_TOKEN && DD_BOT_SECRET) {
-            const CryptoJS = require('crypto-js')
+            const crypto = require('crypto')
             const dateNow = Date.now()
-            const sign = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(`${dateNow}\n${DD_BOT_SECRET}`, DD_BOT_SECRET))
+            const sign = crypto.createHmac('sha256', DD_BOT_SECRET).update(`${dateNow}\n${DD_BOT_SECRET}`).digest('base64')
             options.url = `${options.url}&timestamp=${dateNow}&sign=${encodeURIComponent(sign)}`
             $.post(options, (err, resp, data) => {
                 try {
