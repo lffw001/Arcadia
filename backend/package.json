@@ -21,7 +21,6 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "7.9.1",
     "@prisma/client": "7.9.1",
-    "@types/archiver": "^8.0.0",
     "ansi-regex": "6.2.2",
     "archiver": "8.0.0",
     "axios": "1.19.0",
@@ -45,6 +44,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.3.0",
+    "@types/archiver": "^8.0.0",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
