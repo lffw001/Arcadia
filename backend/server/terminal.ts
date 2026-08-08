@@ -1,6 +1,6 @@
 import type { Server, Socket } from 'socket.io'
 import { APP_ROOT_DIR } from '../core/type'
-import { connectionLimitMiddleware, socketAuthMiddleware } from './socket'
+import { socketAuthMiddleware } from './socket'
 // import { logger } from '../utils/logger'
 
 const MAX_PTY_SESSIONS = 20
@@ -77,7 +77,6 @@ export async function initTerminalServer(io: Server) {
   const terminalNs = io.of('/terminal')
 
   terminalNs.use(socketAuthMiddleware)
-  terminalNs.use(connectionLimitMiddleware)
 
   terminalNs.on('connection', (socket: Socket) => {
     // logger.info(`Terminal socket connected: ${socket.id}`)

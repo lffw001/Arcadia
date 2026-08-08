@@ -5,7 +5,6 @@ import { open, stat } from 'node:fs/promises'
 import { Buffer } from 'node:buffer'
 import db from '../db'
 import { getDaemonLogFilePath } from '../core/daemon'
-import { connectionLimitMiddleware, socketAuthMiddleware } from './socket'
 
 // 单次推送最大字节数，超出时只读最新部分
 const MAX_EMIT_BYTES = 1024 * 1024 // 1 MB
@@ -128,15 +127,10 @@ async function startWatching(socket: Socket, taskId: number, filePath: string): 
 }
 
 /**
- * 初始化守护任务日志实时推送命名空间 /daemon-log
+ * 初始化守护任务日志实时推送
  */
 export function initDaemonLogServer(io: Server): void {
-  const ns = io.of('/daemon-log')
-
-  ns.use(socketAuthMiddleware)
-  ns.use(connectionLimitMiddleware)
-
-  ns.on('connection', (socket: Socket) => {
+  io.on('connection', (socket: Socket) => {
     socket.on('daemon:log:subscribe', async (payload: unknown) => {
       try {
         const id = typeof payload === 'object' && payload !== null ? (payload as { id?: unknown }).id : undefined

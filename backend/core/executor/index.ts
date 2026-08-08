@@ -151,17 +151,17 @@ export function runCodeFile(
 }
 
 /**
- * 构造空 runLog 回调（不推送任何 Socket 事件）
+ * 构造空运行回调（不推送任何 Socket 事件）
  */
 export function makeNoopRunCallbacks(): RunnerCallbacks {
   return { onStdout() {}, onStderr() {}, onError() {}, onExit() {} }
 }
 
 /**
- * 构造 Socket runLog 事件回调
+ * 构造 Socket run:log 事件回调
  */
 export function makeSocketRunCallbacks(): RunnerCallbacks {
-  const name = 'runLog'
+  const name = 'run:log'
   return {
     onStdout(runId, data) {
       socketCommon.emit(name, API_STATUS_CODE.okData({ runId, log: data, stream: 'stdout', over: false }))

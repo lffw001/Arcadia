@@ -13,7 +13,7 @@ export const DepStatus = {
   UNINSTALLING: 4,
 } as const
 
-const socketEventName = 'depOperateResult'
+const socketEventName = 'dep:operate'
 
 export type DepStatusValue = (typeof DepStatus)[keyof typeof DepStatus]
 
