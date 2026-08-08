@@ -7,6 +7,7 @@ import nodePath from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { ZipArchive } from 'archiver'
+import ansiRegex from 'ansi-regex'
 import { execFile, execSync } from 'node:child_process'
 import {
   APP_DIR_PATH,
@@ -484,11 +485,6 @@ function fileNameTimeCompare(fileName: string, time: Date | string): number {
 export function getNeatContent(content: string): string {
   if (!content)
     return content
-  const ansiRegex = ({ onlyFirst = false } = {}) => {
-    // eslint-disable-next-line regexp/no-trivially-nested-quantifier, regexp/no-useless-quantifier, regexp/prefer-w, regexp/no-useless-non-capturing-group, regexp/no-useless-escape
-    const pattern = ['[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)', '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))'].join('|')
-    return new RegExp(pattern, onlyFirst ? undefined : 'g')
-  }
   try {
     return content.replace(ansiRegex(), '')
   }
