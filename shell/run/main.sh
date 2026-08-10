@@ -170,6 +170,8 @@ function command_run_check_options() {
     check_usability "RUN_OPTION_SANDBOX_NET_ALLOW" "RUN_OPTION_SANDBOX_NET_DENY_LOCAL" "--sandbox-net-allow" "--sandbox-net-deny-local"
     check_usability "RUN_OPTION_SANDBOX_NET_ALLOW_BIND_ALL" "RUN_OPTION_SANDBOX_NET_ALLOW_BIND" "--sandbox-net-allow-bind-all" "--sandbox-net-allow-bind"
     check_usability "RUN_OPTION_SANDBOX_HTTP_ALLOW" "RUN_OPTION_SANDBOX_HTTP_DENY" "--sandbox-http-allow" "--sandbox-http-deny"
+    check_usability "RUN_OPTION_SANDBOX_NET_DENY_ALL" "RUN_OPTION_SANDBOX_HTTP_ALLOW" "--sandbox-net-deny-all" "--sandbox-http-allow"
+    check_usability "RUN_OPTION_SANDBOX_NET_DENY_ALL" "RUN_OPTION_SANDBOX_HTTP_DENY" "--sandbox-net-deny-all" "--sandbox-http-deny"
 }
 
 function command_run() {
@@ -452,8 +454,8 @@ function command_run() {
                         if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
                             output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
                         fi
-                        if ! printf '%s' "$2" | grep -Eq '^((tcp|udp)://)?(:[0-9]+|\*|\[[0-9a-fA-F:]+\](:[0-9]+|:\*)?|[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?(:[0-9]+|:\*)?|[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]+|:\*)?(/([0-9]{1,2}|\*))?)$'; then
-                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 含有非法字符！"
+                        if ! printf '%s' "$2" | grep -Eq '^[^[:space:]]+$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 不能包含空格！"
                         fi
                         RUN_OPTION_SANDBOX_NET_ALLOW+=("$2")
                         shift
@@ -462,8 +464,8 @@ function command_run() {
                         if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
                             output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
                         fi
-                        if ! printf '%s' "$2" | grep -Eq '^(:[0-9]+|[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]+|:\*)?(/([0-9]{1,2}|\*))?)$'; then
-                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 含有非法字符！"
+                        if ! printf '%s' "$2" | grep -Eq '^[^[:space:]]+$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 不能包含空格！"
                         fi
                         RUN_OPTION_SANDBOX_NET_DENY+=("$2")
                         shift
@@ -545,7 +547,7 @@ function command_run() {
                         if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
                             output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
                         fi
-                        if ! printf '%s' "$2" | grep -Eq '^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|\*) [A-Za-z0-9.*:/_-]+$'; then
+                        if ! printf '%s' "$2" | grep -Eq '^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT|\*) [A-Za-z0-9.*:/_-]+$'; then
                             output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
                         fi
                         RUN_OPTION_SANDBOX_HTTP_ALLOW+=("$2")
@@ -555,7 +557,7 @@ function command_run() {
                         if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
                             output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
                         fi
-                        if ! printf '%s' "$2" | grep -Eq '^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|\*) [A-Za-z0-9.*:/_-]+$'; then
+                        if ! printf '%s' "$2" | grep -Eq '^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT|\*) [A-Za-z0-9.*:/_-]+$'; then
                             output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
                         fi
                         RUN_OPTION_SANDBOX_HTTP_DENY+=("$2")

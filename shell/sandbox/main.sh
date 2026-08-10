@@ -101,7 +101,8 @@ function sandbox_main() {
             [[ "${_raw_has_http_allow}" == "true" && ("${_raw_has_http_deny}" == "true" || ${#SANDBOX_HTTP_ALLOW[@]} -gt 0 || ${#SANDBOX_HTTP_DENY[@]} -gt 0) ]] ||
             [[ "${_raw_has_http_deny}" == "true" && ("${_raw_has_http_allow}" == "true" || ${#SANDBOX_HTTP_ALLOW[@]} -gt 0 || ${#SANDBOX_HTTP_DENY[@]} -gt 0) ]] ||
             [[ "${_raw_has_clean_env}" == "true" && ("${SANDBOX_CLEAR_ENV}" == "true" || -n "${SANDBOX_ENV_WHITELIST}" || -n "${SANDBOX_ENV_BLACKLIST}") ]] ||
-            [[ "${_raw_has_memory}" == "true" && -n "${SANDBOX_MAX_MEMORY}" ]]; then
+            [[ "${_raw_has_memory}" == "true" && -n "${SANDBOX_MAX_MEMORY}" ]] ||
+            [[ ("${_raw_has_http_allow}" == "true" || "${_raw_has_http_deny}" == "true") && "${SANDBOX_NET_DENY_ALL}" == "true" ]]; then
             output_error "沙箱 ${BLUE}--sandbox-opts${PLAIN} 用法错误，请检查透传参数"
         fi
 
