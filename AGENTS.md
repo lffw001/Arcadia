@@ -1,4 +1,4 @@
-# Arcadia 源代码仓库
+# Arcadia Instructions
 
 项目概述
 - 这是 Arcadia 的公共开源源代码仓库，主要提供后端服务与 CLI 能力。
