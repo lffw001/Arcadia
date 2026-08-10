@@ -116,6 +116,26 @@ function _print_help_run() {
     ${BLUE}--tsx${PLAIN}，${BLUE}--use-tsx${PLAIN}            使用 tsx 执行
     ${BLUE}--ts-node${PLAIN}，${BLUE}--use-ts-node${PLAIN}    使用 ts-node 执行
 
+    沙箱：
+
+    ${BLUE}--sandbox${PLAIN}                                 沙箱模式，在受限环境中运行代码
+    ${BLUE}--sandbox-net-allow${PLAIN} <spec>                出站白名单，仅放行匹配的出站连接，可多次使用，与黑名单选项互斥
+    ${BLUE}--sandbox-net-deny${PLAIN} <spec>                 出站黑名单，屏蔽匹配的出站连接，可多次使用，与白名单选项互斥
+    ${BLUE}--sandbox-net-deny-all${PLAIN}                    完全断网，阻断所有出站连接，与其它出站控制选项互斥
+    ${BLUE}--sandbox-net-deny-local${PLAIN}                  屏蔽局域网，可与黑名单选项叠加，与白名单/断网选项互斥
+    ${BLUE}--sandbox-net-allow-bind${PLAIN} <port>           允许绑定指定端口，放行 TCP 服务端监听，可多次使用
+    ${BLUE}--sandbox-net-allow-bind-all${PLAIN}              允许绑定任意端口，放行 TCP 服务端监听
+    ${BLUE}--sandbox-http-allow${PLAIN} <rule>               HTTP 请求白名单，仅放行匹配的 HTTP/HTTPS 请求，可多次使用，与黑名单选项互斥
+    ${BLUE}--sandbox-http-deny${PLAIN} <rule>                HTTP 请求黑名单，屏蔽匹配的 HTTP/HTTPS 请求，可多次使用，与白名单选项互斥
+    ${BLUE}--sandbox-max-memory${PLAIN} <size>               内存上限（例如 512M、1G）
+    ${BLUE}--sandbox-clear-env${PLAIN}                       清空环境变量，仅保留最小系统路径
+    ${BLUE}--sandbox-env${PLAIN} KEY=VALUE                   注入环境变量，可多次使用
+    ${BLUE}--sandbox-allow-env-whitelist${PLAIN} VAR1,VAR2   环境变量白名单，仅保留指定变量（隐式清空）
+    ${BLUE}--sandbox-allow-env-blacklist${PLAIN} VAR1,VAR2   环境变量黑名单，排除指定变量
+    ${BLUE}--sandbox-allow-read${PLAIN} <path>               追加只读目录，可多次使用
+    ${BLUE}--sandbox-allow-write${PLAIN} <path>              追加读写目录，可多次使用
+    ${BLUE}--sandbox-opts${PLAIN} <args>                     透传底层参数给沙箱引擎，可多次使用
+
   命令帮助：
 
     ${BLUE}<name>${PLAIN} 文件名(仅scripts目录)  ${BLUE}<path>${PLAIN} 相对路径或绝对路径  ${BLUE}<url>${PLAIN} 链接地址  ${BLUE}[--options]${PLAIN} 命令选项
