@@ -143,8 +143,39 @@ export function serializePermissions(keys: PermissionKey[]): string {
   return keys.join(',')
 }
 
-// Token 缓存
-const tokenCache = new Map<string, openApiAccessKeyModel | null>()
+// Token 缓存（LRU + TTL）
+const TOKEN_CACHE_MAX = 1000
+const TOKEN_CACHE_TTL_MS = 10 * 60 * 1000
+
+interface TokenCacheEntry {
+  record: openApiAccessKeyModel | null
+  cachedAt: number
+}
+
+const tokenCache = new Map<string, TokenCacheEntry>()
+
+function getCachedToken(token: string): openApiAccessKeyModel | null | undefined {
+  const entry = tokenCache.get(token)
+  if (entry === undefined)
+    return undefined
+  if (Date.now() - entry.cachedAt >= TOKEN_CACHE_TTL_MS) {
+    tokenCache.delete(token)
+    return undefined
+  }
+  // 刷新 LRU 顺序
+  tokenCache.delete(token)
+  tokenCache.set(token, entry)
+  return entry.record
+}
+
+function setCachedToken(token: string, record: openApiAccessKeyModel | null) {
+  tokenCache.set(token, { record, cachedAt: Date.now() })
+  if (tokenCache.size > TOKEN_CACHE_MAX) {
+    const oldestKey = tokenCache.keys().next().value
+    if (oldestKey !== undefined)
+      tokenCache.delete(oldestKey)
+  }
+}
 
 function invalidateCache(token: string) {
   tokenCache.delete(token)
@@ -155,7 +186,7 @@ export function generateToken() {
 }
 
 export async function verifyToken(token: string) {
-  const cached = tokenCache.get(token)
+  const cached = getCachedToken(token)
   if (cached !== undefined) {
     if (!cached)
       return null
@@ -172,13 +203,13 @@ export async function verifyToken(token: string) {
       where: { value: token, enable: 1 },
     })
     if (!record) {
-      tokenCache.set(token, null)
+      setCachedToken(token, null)
       return null
     }
     if (record.expire_time && new Date(record.expire_time) < new Date()) {
       return null
     }
-    tokenCache.set(token, record)
+    setCachedToken(token, record)
     return record
   }
   catch (e: any) {
@@ -204,7 +235,7 @@ export async function createToken(data?: {
     enable: 1,
     permissions: serializePermissions(perms),
   })
-  tokenCache.set(record.value, record)
+  setCachedToken(record.value, record)
   return record
 }
 
@@ -242,7 +273,7 @@ export async function initTokenCache() {
   try {
     const records = await db.openApiAccessKey.$list({ where: { enable: 1 } })
     for (const record of records) {
-      tokenCache.set(record.value, record)
+      setCachedToken(record.value, record)
     }
   }
   catch (e: any) {
