@@ -10,6 +10,10 @@ function service_manage() {
         npm install --omit=dev
     }
 
+    function output_db_error() {
+        output_error "Prisma 初始化失败（客户端生成或数据库同步），请查看报错并分析原因！"
+    }
+
     local ServiceStatus
     pm2_list_all_services
     cat $FilePm2List | awk -F '|' '{print$3}' | grep "arcadia_server" -wq
@@ -25,17 +29,22 @@ function service_manage() {
             local ServiceStatus=$(cat $FilePm2List | grep "arcadia_server" -w | awk -F '|' '{print$10}')
             case ${ServiceStatus} in
             online)
-                pm2 restart arcadia_server
+                sync_prisma_schema || output_db_error
+                cd $SrcDir
+                pm2 startOrRestart ecosystem.config.cjs
                 echo -e "\n$COMPLETE 后台管理面板已重启\n"
                 ;;
             stopped)
-                pm2 start arcadia_server
+                sync_prisma_schema || output_db_error
+                cd $SrcDir
+                pm2 startOrRestart ecosystem.config.cjs
                 echo -e "\n$COMPLETE 后台管理面板已重新启动\n"
                 ;;
             errored)
                 echo -e "\n$WARN 检测到服务状态异常，开始尝试修复...\n"
                 pm2 delete arcadia_server
                 install_dependencies
+                sync_prisma_schema || output_db_error
                 cd $SrcDir
                 pm2 start ecosystem.config.cjs && sleep 3
                 pm2_list_all_services
@@ -49,6 +58,7 @@ function service_manage() {
             esac
         else
             install_dependencies
+            sync_prisma_schema || output_db_error
             cd $SrcDir
             pm2 start ecosystem.config.cjs && sleep 1
             pm2_list_all_services

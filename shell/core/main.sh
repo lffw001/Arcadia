@@ -110,6 +110,15 @@ function load_user_env() {
     fi
 }
 
+## 同步 Prisma 客户端与数据库 schema
+function sync_prisma_schema() {
+    local current_dir=$(pwd)
+    cd $BackendDir
+    npm run generate || return 1
+    echo 'y' | npm run db:push -- --accept-data-loss >./prisma_push.log || return 1
+    cd $current_dir
+}
+
 ## 计算字符串长度
 function string_length() {
     local text=$1
