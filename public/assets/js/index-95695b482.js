@@ -1,0 +1,1 @@
+var e={table:{apiSetting:{pageField:`page`,sizeField:`size`,listField:`data`,totalField:`total`},defaultPageSize:10,pageSizes:[5,10,20,50,100,200,500,1e3,2e3]},upload:{apiSetting:{infoField:`data`,imgField:`photo`},maxSize:2,fileType:[`image/png`,`image/jpg`,`image/jpeg`,`image/gif`,`image/svg+xml`]}};export{e as t};
