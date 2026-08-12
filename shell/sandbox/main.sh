@@ -56,7 +56,7 @@ function sandbox_main() {
     if [[ ${#SANDBOX_OPTS[@]} -gt 0 ]]; then
         for _opts_item in "${SANDBOX_OPTS[@]}"; do
             if ! _opts_line="$(printf '%s' "${_opts_item}" | perl -MText::ParseWords -ne 'my @w = shellwords($_); if (!@w && /\S/) { die "parse error\n" } print join(" ", map { my $s=$_; $s =~ s/([\\"\$`])/\\$1/g; "\"$s\"" } @w)' 2>&1)"; then
-                output_error "沙箱 ${BLUE}--sandbox-opts${PLAIN} 用法错误，请检查透传参数"
+                output_error "沙箱 ${BLUE}--sandbox-opts${PLAIN} 用法错误，请检查透传参数内容！"
             fi
             [[ -n "${_opts_line}" ]] && eval "_args+=(${_opts_line})"
         done
@@ -129,6 +129,11 @@ function sandbox_main() {
     done
     _args+=("-w" "/tmp")
     _args+=("-w" "${FileDir}")
+
+    # 防止沙箱内代码窃取其它进程的文件描述符或读写其它进程内存（后两者默认已在黑名单，显式声明为加固）
+    _args+=("--extra-deny-syscall" "pidfd_getfd")
+    _args+=("--extra-deny-syscall" "process_vm_readv")
+    _args+=("--extra-deny-syscall" "process_vm_writev")
 
     # 用户追加路径
     if [[ ${#SANDBOX_ALLOW_WRITE[@]} -gt 0 ]]; then

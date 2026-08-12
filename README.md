@@ -36,6 +36,7 @@ docker run -dit \
 --hostname arcadia \
 --network bridge \
 --restart always \
+--cap-add SYS_PTRACE \
 -p 5678:5678 \
 -v /opt/arcadia/config:/arcadia/config \
 -v /opt/arcadia/log:/arcadia/log \
