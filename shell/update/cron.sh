@@ -13,7 +13,7 @@ function output_table_data() {
         fi
         shift
     done
-    echo '['"${data}"']' | ctp -s 2>/dev/null
+    echo '['"${data}"']' | ctp -s -t '{"charLength": { "✅": 2, "❌": 2 }}' 2>/dev/null
 }
 # output_table_data_file <target_file>
 function output_table_data_file() {
@@ -21,7 +21,7 @@ function output_table_data_file() {
     if [ -s "$target_file" ]; then
         ulimit -c 0 >/dev/null 2>&1 # 禁用 Core Dump
         local data="$(cat $target_file | jq -cM 2>/dev/null)"
-        echo "${data}" | ctp -s 2>/dev/null
+        echo "${data}" | ctp -s -t '{"charLength": { "✅": 2, "❌": 2 }}' 2>/dev/null
     fi
 }
 

@@ -3,8 +3,8 @@ module.exports = {
     {
       name: 'arcadia_server',
       cwd: 'backend',
-      script: 'npm',
-      args: 'run server',
+      script: 'node_modules/.bin/tsx',
+      args: 'index',
       watch: true,
       watch_delay: 2000,
       ignore_watch: [

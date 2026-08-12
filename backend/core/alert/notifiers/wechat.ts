@@ -22,7 +22,7 @@ export async function sendWechatNotification(msg: messageModel, notification: al
       })
 
       if (response.data.errcode === 0) {
-        logger.log(`WeChat notification sent successfully: ${title}`)
+        logger.info(`WeChat notification sent successfully: ${title}`)
       }
       else {
         logger.error(`Failed to send WeChat notification: ${title}, error: ${response.data.errmsg}`)
@@ -31,7 +31,7 @@ export async function sendWechatNotification(msg: messageModel, notification: al
     }
 
     // 其他微信通知方式需要根据具体实现处理
-    logger.log(`WeChat notification processed: ${title} (specific implementation depends on target configuration)`)
+    logger.info(`WeChat notification processed: ${title} (specific implementation depends on target configuration)`)
   }
   catch (e: any) {
     logger.error(`Error sending WeChat notification to ${notification.target}: ${msg.title}`, e.message || e)

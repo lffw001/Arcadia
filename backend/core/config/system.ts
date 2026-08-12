@@ -3,8 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { APP_DIR_PATH } from '../type'
 import { ConfigKeySystem, ConfigModule } from '../type/config'
-import { setCronTimezone } from '../cron/engine'
+import { reapplyAllTimezone, setCronTimezone } from '../cron/engine'
 import db from '../../db'
+import { updateSystemConfigValues } from './update'
 
 const DEP_SH_PATH = path.join(APP_DIR_PATH.SHELL, 'utils/dep.sh')
 
@@ -50,9 +51,7 @@ export function depSetSource(ecosystem: 'npm' | 'pnpm' | 'pip' | 'apt' | 'gem', 
  * 若对应配置键在 DB 中为空，则调用 dep.sh get-source 检测当前系统源并写入 DB
  */
 export async function detectAndSaveSourcesIfEmpty(): Promise<void> {
-  const configs = await db.config.findMany({
-    where: { module: ConfigModule.SYSTEM },
-  })
+  const configs = await db.config.$list({ where: { module: ConfigModule.SYSTEM } })
   const configMap: Record<string, string> = {}
   for (const item of configs) {
     configMap[item.key] = item.value
@@ -65,21 +64,17 @@ export async function detectAndSaveSourcesIfEmpty(): Promise<void> {
     { key: ConfigKeySystem.GEM_REGISTRY, ecosystem: 'gem' },
   ]
 
-  const saves: Promise<any>[] = []
+  const entries: Array<{ key: ConfigKeySystem, value: string }> = []
   for (const { key, ecosystem } of detections) {
     if (!configMap[key]) {
       const detected = depGetSource(ecosystem)
       if (detected) {
-        saves.push(db.config.upsert({
-          where: { key_module: { key, module: ConfigModule.SYSTEM } },
-          update: { value: detected },
-          create: { key, module: ConfigModule.SYSTEM, value: detected },
-        }))
+        entries.push({ key, value: detected })
       }
     }
   }
-  if (saves.length > 0) {
-    await Promise.all(saves)
+  if (entries.length > 0) {
+    await updateSystemConfigValues(entries)
   }
 }
 
@@ -98,6 +93,7 @@ export function applySystemTimezone(tz: string): void {
     return
 
   setCronTimezone(tz)
+  reapplyAllTimezone()
   try {
     if (fs.existsSync(zoneFile)) {
       if (fs.existsSync('/etc/localtime')) {

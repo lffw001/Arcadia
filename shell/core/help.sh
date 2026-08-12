@@ -35,6 +35,8 @@ function _print_help_main() {
   其它
   ${BLUE}rmlog${PLAIN}           清理运行日志文件
   ${BLUE}notify <args>${PLAIN}   推送自定义通知消息
+
+  ${BLUE}--version${PLAIN}, ${BLUE}-v${PLAIN}   查看版本
 "
 }
 
@@ -95,7 +97,7 @@ function _print_help_run() {
     ${BLUE}-D${PLAIN}, ${BLUE}--delay${PLAIN}                 延迟执行 - 随机倒数一定秒数后再执行代码文件
     ${BLUE}-a${PLAIN}, ${BLUE}--agent${PLAIN}                 网络代理 - 为 JavaScript 和 TypeScript 代码文件启用全局 HTTP/HTTPS 代理，配置方法详见文档
     ${BLUE}-T${PLAIN}, ${BLUE}--timeout${PLAIN}               运行超时 - 设置运行任务超时机制，选项后需跟 timeout 指令的参数作为选项值
-    ${BLUE}-N${PLAIN}, ${BLUE}--no-log${PLAIN}                不记录日志 - 不存储代码运行日志到本地
+    ${BLUE}-N${PLAIN}, ${BLUE}--no-log${PLAIN}                禁用日志 - 不记录代码运行日志
     ${BLUE}-p${PLAIN}, ${BLUE}--proxy${PLAIN}                 启用下载代理 - 仅适用于执行位于 GitHub 仓库的代码文件，代理固定为 jsDelivr CDN
     ${BLUE}-c${PLAIN}, ${BLUE}--concurrent${PLAIN}            并发运行 - 默认运行1个任务，若想增加运行任务数量那么请传参任务数量
     ${BLUE}-t${PLAIN}, ${BLUE}--thread${PLAIN}                并发线程数 - 指定同时运行的最大任务数量，选项后需跟正整数，需与并发运行同时使用
@@ -113,6 +115,26 @@ function _print_help_run() {
     ${BLUE}--node${PLAIN}，${BLUE}--use-node${PLAIN}          使用 Node.js 运行时
     ${BLUE}--tsx${PLAIN}，${BLUE}--use-tsx${PLAIN}            使用 tsx 执行
     ${BLUE}--ts-node${PLAIN}，${BLUE}--use-ts-node${PLAIN}    使用 ts-node 执行
+
+    沙箱：
+
+    ${BLUE}--sandbox${PLAIN}                                 沙箱模式，在受限环境中运行代码
+    ${BLUE}--sandbox-net-allow${PLAIN} <spec>                出站白名单，仅放行匹配的出站连接，可多次使用，与黑名单选项互斥
+    ${BLUE}--sandbox-net-deny${PLAIN} <spec>                 出站黑名单，屏蔽匹配的出站连接，可多次使用，与白名单选项互斥
+    ${BLUE}--sandbox-net-deny-all${PLAIN}                    完全断网，阻断所有出站连接，与其它出站控制/HTTP 过滤选项互斥
+    ${BLUE}--sandbox-net-deny-local${PLAIN}                  屏蔽局域网与本机，可与黑名单选项叠加，与白名单/断网选项互斥
+    ${BLUE}--sandbox-net-allow-bind${PLAIN} <port>           允许绑定指定端口，放行 TCP 服务端监听，可多次使用
+    ${BLUE}--sandbox-net-allow-bind-all${PLAIN}              允许绑定任意端口，放行 TCP 服务端监听
+    ${BLUE}--sandbox-http-allow${PLAIN} <rule>               HTTP 请求白名单，仅放行匹配的 HTTP/HTTPS 请求，可多次使用，与黑名单选项互斥
+    ${BLUE}--sandbox-http-deny${PLAIN} <rule>                HTTP 请求黑名单，屏蔽匹配的 HTTP/HTTPS 请求，可多次使用，与白名单选项互斥
+    ${BLUE}--sandbox-max-memory${PLAIN} <size>               内存上限（例如 512M、1G）
+    ${BLUE}--sandbox-clear-env${PLAIN}                       清空环境变量，仅保留最小系统路径
+    ${BLUE}--sandbox-env${PLAIN} KEY=VALUE                   注入环境变量，可多次使用
+    ${BLUE}--sandbox-allow-env-whitelist${PLAIN} VAR1,VAR2   环境变量白名单，仅保留指定变量（隐式清空）
+    ${BLUE}--sandbox-allow-env-blacklist${PLAIN} VAR1,VAR2   环境变量黑名单，排除指定变量
+    ${BLUE}--sandbox-allow-read${PLAIN} <path>               追加只读目录，可多次使用
+    ${BLUE}--sandbox-allow-write${PLAIN} <path>              追加读写目录，可多次使用
+    ${BLUE}--sandbox-opts${PLAIN} <args>                     透传底层参数给沙箱引擎，可多次使用
 
   命令帮助：
 

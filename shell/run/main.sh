@@ -1,6 +1,8 @@
 #!/bin/bash
 
 function command_run_main() {
+    local _run_exit_code=0
+
     ## 匹配代码文件
     import core/script
     find_script "${1}"
@@ -43,11 +45,14 @@ function command_run_main() {
     fi
 
     run_script_main
+    _run_exit_code=$?
 
     # 执行用户自定义执行后脚本
     if [[ "${CLI_CONFIG_ENABLE_TASK_AFTER_EXTRA}" == "true" ]] && [[ -f $FileTaskAfterExtra ]]; then
         source $FileTaskAfterExtra
     fi
+
+    return ${_run_exit_code}
 }
 
 function reset_options() {
@@ -98,6 +103,24 @@ function reset_options() {
     RUN_OPTION_USE_TS_NODE=""
     RUN_OPTION_USE_NODE=""
     RUN_OPTION_USE_TSX=""
+    # 隔离运行（沙箱模式）
+    RUN_OPTION_SANDBOX=""
+    RUN_OPTION_SANDBOX_NET_ALLOW=()
+    RUN_OPTION_SANDBOX_NET_DENY=()
+    RUN_OPTION_SANDBOX_NET_DENY_ALL=""
+    RUN_OPTION_SANDBOX_NET_DENY_LOCAL=""
+    RUN_OPTION_SANDBOX_NET_ALLOW_BIND=()
+    RUN_OPTION_SANDBOX_NET_ALLOW_BIND_ALL=""
+    RUN_OPTION_SANDBOX_MAX_MEMORY=""
+    RUN_OPTION_SANDBOX_CLEAR_ENV=""
+    RUN_OPTION_SANDBOX_ENV_VARS=()
+    RUN_OPTION_SANDBOX_ENV_WHITELIST=""
+    RUN_OPTION_SANDBOX_ENV_BLACKLIST=""
+    RUN_OPTION_SANDBOX_ALLOW_READ=()
+    RUN_OPTION_SANDBOX_ALLOW_WRITE=()
+    RUN_OPTION_SANDBOX_HTTP_ALLOW=()
+    RUN_OPTION_SANDBOX_HTTP_DENY=()
+    RUN_OPTION_SANDBOX_OPTS=()
 }
 
 ## 检查命令选项兼容性和使用合法性
@@ -108,7 +131,7 @@ function command_run_check_options() {
         local var2=$2
         local option1=$3
         local option2=$4
-        if [[ "${!var1}" == "true" ]] && [[ "${!var2}" == "true" ]]; then
+        if [[ -n "${!var1}" ]] && [[ -n "${!var2}" ]]; then
             output_error "${BLUE}${option1}${PLAIN} 与 ${BLUE}${option2}${PLAIN} 不可同时使用！"
         fi
     }
@@ -134,6 +157,21 @@ function command_run_check_options() {
     if [[ "${RUN_OPTION_THREAD}" == "true" ]] && [[ "${RUN_OPTION_CONCURRENT}" != "true" ]]; then
         output_error "检测到无效参数 ${BLUE}--thread${PLAIN} ，该命令选项仅适用于并发运行模式，请配合 ${BLUE}--concurrent${PLAIN} 使用！"
     fi
+
+    ## 沙箱选项互斥检查
+    [[ "${RUN_OPTION_SANDBOX}" == "true" ]] || return
+    check_usability "RUN_OPTION_SANDBOX_CLEAR_ENV" "RUN_OPTION_SANDBOX_ENV_WHITELIST" "--sandbox-clear-env" "--sandbox-allow-env-whitelist"
+    check_usability "RUN_OPTION_SANDBOX_ENV_BLACKLIST" "RUN_OPTION_SANDBOX_CLEAR_ENV" "--sandbox-allow-env-blacklist" "--sandbox-clear-env"
+    check_usability "RUN_OPTION_SANDBOX_ENV_BLACKLIST" "RUN_OPTION_SANDBOX_ENV_WHITELIST" "--sandbox-allow-env-blacklist" "--sandbox-allow-env-whitelist"
+    check_usability "RUN_OPTION_SANDBOX_NET_DENY_ALL" "RUN_OPTION_SANDBOX_NET_ALLOW" "--sandbox-net-deny-all" "--sandbox-net-allow"
+    check_usability "RUN_OPTION_SANDBOX_NET_DENY_ALL" "RUN_OPTION_SANDBOX_NET_DENY" "--sandbox-net-deny-all" "--sandbox-net-deny"
+    check_usability "RUN_OPTION_SANDBOX_NET_DENY_ALL" "RUN_OPTION_SANDBOX_NET_DENY_LOCAL" "--sandbox-net-deny-all" "--sandbox-net-deny-local"
+    check_usability "RUN_OPTION_SANDBOX_NET_ALLOW" "RUN_OPTION_SANDBOX_NET_DENY" "--sandbox-net-allow" "--sandbox-net-deny"
+    check_usability "RUN_OPTION_SANDBOX_NET_ALLOW" "RUN_OPTION_SANDBOX_NET_DENY_LOCAL" "--sandbox-net-allow" "--sandbox-net-deny-local"
+    check_usability "RUN_OPTION_SANDBOX_NET_ALLOW_BIND_ALL" "RUN_OPTION_SANDBOX_NET_ALLOW_BIND" "--sandbox-net-allow-bind-all" "--sandbox-net-allow-bind"
+    check_usability "RUN_OPTION_SANDBOX_HTTP_ALLOW" "RUN_OPTION_SANDBOX_HTTP_DENY" "--sandbox-http-allow" "--sandbox-http-deny"
+    check_usability "RUN_OPTION_SANDBOX_NET_DENY_ALL" "RUN_OPTION_SANDBOX_HTTP_ALLOW" "--sandbox-net-deny-all" "--sandbox-http-allow"
+    check_usability "RUN_OPTION_SANDBOX_NET_DENY_ALL" "RUN_OPTION_SANDBOX_HTTP_DENY" "--sandbox-net-deny-all" "--sandbox-http-deny"
 }
 
 function command_run() {
@@ -404,6 +442,132 @@ function command_run() {
                         RUN_OPTION_SPLIT_ENV_NAME="$2"
                         RUN_OPTION_SPLIT_ENV_SEPARATOR="$3"
                         shift
+                        shift
+                        ;;
+                    --sandbox)
+                        RUN_OPTION_SANDBOX="true"
+                        ;;
+                    --sandbox-net-deny-all)
+                        RUN_OPTION_SANDBOX_NET_DENY_ALL="true"
+                        ;;
+                    --sandbox-net-allow)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^[^[:space:]]+$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 不能包含空格！"
+                        fi
+                        RUN_OPTION_SANDBOX_NET_ALLOW+=("$2")
+                        shift
+                        ;;
+                    --sandbox-net-deny)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^[^[:space:]]+$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 不能包含空格！"
+                        fi
+                        RUN_OPTION_SANDBOX_NET_DENY+=("$2")
+                        shift
+                        ;;
+                    --sandbox-net-deny-local)
+                        RUN_OPTION_SANDBOX_NET_DENY_LOCAL="true"
+                        ;;
+                    --sandbox-net-allow-bind)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
+                        fi
+                        RUN_OPTION_SANDBOX_NET_ALLOW_BIND+=("$2")
+                        shift
+                        ;;
+                    --sandbox-net-allow-bind-all)
+                        RUN_OPTION_SANDBOX_NET_ALLOW_BIND_ALL="true"
+                        ;;
+                    --sandbox-max-memory)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^[0-9]+[MGmg]$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
+                        fi
+                        RUN_OPTION_SANDBOX_MAX_MEMORY="$2"
+                        shift
+                        ;;
+                    --sandbox-clear-env)
+                        RUN_OPTION_SANDBOX_CLEAR_ENV="true"
+                        ;;
+                    --sandbox-env)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*='; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
+                        fi
+                        RUN_OPTION_SANDBOX_ENV_VARS+=("$2")
+                        shift
+                        ;;
+                    --sandbox-allow-env-whitelist)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*(,[A-Za-z_][A-Za-z0-9_]*)*$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
+                        fi
+                        RUN_OPTION_SANDBOX_ENV_WHITELIST="$2"
+                        shift
+                        ;;
+                    --sandbox-allow-env-blacklist)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*(,[A-Za-z_][A-Za-z0-9_]*)*$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
+                        fi
+                        RUN_OPTION_SANDBOX_ENV_BLACKLIST="$2"
+                        shift
+                        ;;
+                    --sandbox-allow-read)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        RUN_OPTION_SANDBOX_ALLOW_READ+=("$2")
+                        shift
+                        ;;
+                    --sandbox-allow-write)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        RUN_OPTION_SANDBOX_ALLOW_WRITE+=("$2")
+                        shift
+                        ;;
+                    --sandbox-http-allow)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT|\*) [A-Za-z0-9.*:/_-]+$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
+                        fi
+                        RUN_OPTION_SANDBOX_HTTP_ALLOW+=("$2")
+                        shift
+                        ;;
+                    --sandbox-http-deny)
+                        if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        if ! printf '%s' "$2" | grep -Eq '^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT|\*) [A-Za-z0-9.*:/_-]+$'; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 参数值 ${BLUE}$2${PLAIN} 格式有误！"
+                        fi
+                        RUN_OPTION_SANDBOX_HTTP_DENY+=("$2")
+                        shift
+                        ;;
+                    --sandbox-opts)
+                        if [[ -z "$2" ]]; then
+                            output_error "命令选项 ${BLUE}$1${PLAIN} 缺少参数值！"
+                        fi
+                        RUN_OPTION_SANDBOX_OPTS+=("$2")
                         shift
                         ;;
                     *)

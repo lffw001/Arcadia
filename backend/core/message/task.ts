@@ -1,18 +1,32 @@
-import { addAfterTaskRun, addBeforeTaskRun } from '../cron/taskRunner'
-import { MessageListener } from './listenMessage'
+import type { taskRunInfo } from '../cron/taskRunner'
+import { sendMessage } from './index'
+import { logger } from '../../utils/logger'
 
-const baseWorkerDir = (() => process.platform === 'win32' ? '../../../../tmp/' : '/tmp/')()
-;(() => {
-  addBeforeTaskRun((task) => {
-    const id = `${task.id}_${(Math.random() * 99999999).toFixed(0)}${(Math.random() * 99999999).toString(36)}`
-    const workDir = `${baseWorkerDir}${id}/`;
-    (task as any).$messageListener = new MessageListener(workDir, { taskId: task.id })
-    task.shell = `export __MESSAGE_SEND_TO_SERVER_BASE_DIR=${workDir} ; ${task.shell}`
-    // 必须最后执行,保证环境变量第一个设置
-  }, 99999)
+function formatDuration(ms: number): string {
+  if (ms < 1000)
+    return `${ms}ms`
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60)
+    return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainSeconds = seconds % 60
+  return `${minutes}m ${remainSeconds}s`
+}
 
-  addAfterTaskRun((info) => {
-    (info.task as any).$messageListener?.stopListening()
-    delete (info.task as any).$messageListener
-  })
-})()
+export async function notifyTaskFailure(info: taskRunInfo) {
+  if (info.success)
+    return
+  if (info.task.error_notify !== 1)
+    return
+  try {
+    await sendMessage({
+      title: '定时任务运行失败',
+      content: `任务名称：${info.task.name}\n任务 ID：${info.task.id}\n执行时长：${formatDuration(info.duration)}\n失败时间：${new Date(info.endTime).toLocaleString()}`,
+      category: 'cron',
+      type: 'error',
+    })
+  }
+  catch (e: any) {
+    logger.error(`推送定时任务运行失败通知异常 (task: ${info.task.name}):`, e.message || e)
+  }
+}

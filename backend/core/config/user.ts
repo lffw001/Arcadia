@@ -1,13 +1,13 @@
 import type { ConfigDataUser } from '../type/config'
 import { ConfigKeyUser, DEFAULT_USER_CONFIG_VALUES } from '../type/config'
-import { updateUserConfigValue } from './index'
+import { updateUserConfigValues } from './index'
 import { isNotEmpty } from '../../utils'
-import type { configModel } from '../../db'
-import CryptoJS from 'crypto-js'
+import { Buffer } from 'node:buffer'
+import { pbkdf2Sync, randomBytes } from 'node:crypto'
 
 const HASH_PREFIX = 'pbkdf2:'
 const PBKDF2_ITERATIONS = 10000
-const PBKDF2_KEY_SIZE = 8 // 8 words × 32 bits = 256 bits
+const PBKDF2_KEY_LENGTH = 32 // 32 bytes = 256 bits
 
 /**
  * 判断存储的密码值是否已是哈希格式
@@ -21,13 +21,9 @@ export function isHashedPassword(stored: string): boolean {
  * 格式：pbkdf2:<iterations>:<salt_hex>:<hash_hex>
  */
 export function hashPassword(plaintext: string): string {
-  const salt = CryptoJS.lib.WordArray.random(16)
-  const hash = CryptoJS.PBKDF2(plaintext, salt, {
-    keySize: PBKDF2_KEY_SIZE,
-    iterations: PBKDF2_ITERATIONS,
-    hasher: CryptoJS.algo.SHA256,
-  })
-  return `${HASH_PREFIX}${PBKDF2_ITERATIONS}:${salt.toString()}:${hash.toString()}`
+  const salt = randomBytes(16)
+  const hash = pbkdf2Sync(plaintext, salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH, 'sha256')
+  return `${HASH_PREFIX}${PBKDF2_ITERATIONS}:${salt.toString('hex')}:${hash.toString('hex')}`
 }
 
 /**
@@ -49,12 +45,8 @@ export function verifyPassword(plaintext: string, stored: string): { valid: bool
     }
     const expectedHash = parts[3]
     try {
-      const salt = CryptoJS.enc.Hex.parse(saltHex)
-      const actualHash = CryptoJS.PBKDF2(plaintext, salt, {
-        keySize: PBKDF2_KEY_SIZE,
-        iterations,
-        hasher: CryptoJS.algo.SHA256,
-      }).toString()
+      const salt = Buffer.from(saltHex, 'hex')
+      const actualHash = pbkdf2Sync(plaintext, salt, iterations, PBKDF2_KEY_LENGTH, 'sha256').toString('hex')
       return { valid: actualHash === expectedHash, needsMigration: false }
     }
     catch {
@@ -70,14 +62,16 @@ export function verifyPassword(plaintext: string, stored: string): { valid: bool
  * 保存用户登录凭证
  */
 export async function saveUserCredentials(config: Partial<ConfigDataUser>) {
-  const updates: Promise<configModel>[] = []
+  const entries: Array<{ key: ConfigKeyUser, value: string }> = []
   if (isNotEmpty(config.username)) {
-    updates.push(updateUserConfigValue(ConfigKeyUser.USERNAME, config.username as string))
+    entries.push({ key: ConfigKeyUser.USERNAME, value: config.username as string })
   }
   if (isNotEmpty(config.password)) {
-    updates.push(updateUserConfigValue(ConfigKeyUser.PASSWORD, hashPassword(config.password as string)))
+    entries.push({ key: ConfigKeyUser.PASSWORD, value: hashPassword(config.password as string) })
   }
-  await Promise.all(updates)
+  if (entries.length > 0) {
+    await updateUserConfigValues(entries)
+  }
 }
 
 /**

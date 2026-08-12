@@ -343,7 +343,6 @@ function run_script_core() {
         [ $? -eq 0 ] && operation_title="重启" || operation_title="启动"
         # 删除原有
         pm2 stop "${RUN_OPTION_DAEMON_NAME:-$FileName}" >/dev/null 2>&1
-        pm2 flush "${RUN_OPTION_DAEMON_NAME:-$FileName}" >/dev/null 2>&1
         pm2 delete "${RUN_OPTION_DAEMON_NAME:-$FileName}" >/dev/null 2>&1
         # 启动（此处特殊，需要替换命令中的日志标记）
         run_cmd="${run_cmd//<LogFilePath>/${LogFilePath}}"
@@ -385,16 +384,29 @@ function run_script_core() {
         # 运行超时（命令选项）
         [[ "${RUN_OPTION_TIMEOUT}" == "true" ]] && run_cmd="timeout ${RUN_OPTION_TIMEOUT_OPTIONS} bash -c \"${run_cmd}\""
         # 执行
-        bash -c "${run_cmd}"
+        local _exit_code=0
+        bash -c "set -o pipefail ; ${run_cmd}" || _exit_code=$?
+        # 沙箱引擎错误检测
+        if [[ "${RUN_OPTION_SANDBOX}" == "true" && -f "${LogTmpDir}/.sandlock-err-$$.log" ]]; then
+            local _sandlock_err
+            _sandlock_err="$(cat "${LogTmpDir}/.sandlock-err-$$.log" 2>/dev/null)"
+            rm -f "${LogTmpDir}/.sandlock-err-$$.log"
+            if [[ -n "${_sandlock_err}" ]]; then
+                output_error "沙箱引擎错误：\n${_sandlock_err}"
+            fi
+        fi
         if [[ "${RUN_OPTION_NO_LOG}" != "true" ]]; then
             # 记录执行结束时间
             _record_log_end_title "执行完毕，总用时 $(($(date +%s) - start_timestamp)) 秒"
         fi
+        return ${_exit_code}
     fi
 }
 
 function run_script_main() {
     local LogFilePath LogFileName arg_group_item env_value operation_title
+    local _run_exit_code=0
+
     # 记录编排进程 PID（供 stop 命令终止进程树）
     local _run_pid_file="${LogTmpDir}/.run_${FileName}_$$.pid"
     make_dir "${LogTmpDir}"
@@ -416,6 +428,29 @@ function run_script_main() {
     # 定义基准命令
     local base_cmd=""
     define_base_command
+
+    # 隔离运行（沙箱模式）
+    if [[ "${RUN_OPTION_SANDBOX}" == "true" ]]; then
+        import sandbox
+        SANDBOX_NET_ALLOW=("${RUN_OPTION_SANDBOX_NET_ALLOW[@]}")
+        SANDBOX_NET_DENY=("${RUN_OPTION_SANDBOX_NET_DENY[@]}")
+        SANDBOX_NET_DENY_ALL="${RUN_OPTION_SANDBOX_NET_DENY_ALL}"
+        SANDBOX_NET_DENY_LOCAL="${RUN_OPTION_SANDBOX_NET_DENY_LOCAL}"
+        SANDBOX_NET_ALLOW_BIND=("${RUN_OPTION_SANDBOX_NET_ALLOW_BIND[@]}")
+        SANDBOX_NET_ALLOW_BIND_ALL="${RUN_OPTION_SANDBOX_NET_ALLOW_BIND_ALL}"
+        SANDBOX_MAX_MEMORY="${RUN_OPTION_SANDBOX_MAX_MEMORY}"
+        SANDBOX_CLEAR_ENV="${RUN_OPTION_SANDBOX_CLEAR_ENV}"
+        SANDBOX_ENV_VARS=("${RUN_OPTION_SANDBOX_ENV_VARS[@]}")
+        SANDBOX_ENV_WHITELIST="${RUN_OPTION_SANDBOX_ENV_WHITELIST}"
+        SANDBOX_ENV_BLACKLIST="${RUN_OPTION_SANDBOX_ENV_BLACKLIST}"
+        SANDBOX_ALLOW_READ=("${RUN_OPTION_SANDBOX_ALLOW_READ[@]}")
+        SANDBOX_ALLOW_WRITE=("${RUN_OPTION_SANDBOX_ALLOW_WRITE[@]}")
+        SANDBOX_HTTP_ALLOW=("${RUN_OPTION_SANDBOX_HTTP_ALLOW[@]}")
+        SANDBOX_HTTP_DENY=("${RUN_OPTION_SANDBOX_HTTP_DENY[@]}")
+        SANDBOX_OPTS=("${RUN_OPTION_SANDBOX_OPTS[@]}")
+        sandbox_main "${base_cmd}"
+        base_cmd="${_SANDBOX_WRAPPED_CMD}"
+    fi
 
     # 初始化线程池（命令选项）
     local _thread_task_index=0
@@ -461,6 +496,7 @@ function run_script_main() {
                 # 延迟执行（命令选项）
                 [[ "${RUN_OPTION_DELAY}" == "true" ]] && random_delay
                 run_script_core "${base_cmd}"
+                _run_exit_code=$?
             done
             # 恢复原有变量值以应用下一次重组匹配
             eval export "${RUN_OPTION_RECOMBINE_ENV_NAME}"=\""${RUN_OPTION_RECOMBINE_ENV_ORIGINAL_VALUE}"\"
@@ -494,6 +530,7 @@ function run_script_main() {
                 # 延迟执行（命令选项）
                 [[ "${RUN_OPTION_DELAY}" == "true" ]] && random_delay
                 run_script_core "${base_cmd}"
+                _run_exit_code=$?
             done
             let env_index++
         done
@@ -512,6 +549,7 @@ function run_script_main() {
             # 延迟执行（命令选项）
             [[ "${RUN_OPTION_DELAY}" == "true" ]] && random_delay
             run_script_core "${base_cmd}"
+            _run_exit_code=$?
         done
     fi
 
@@ -541,4 +579,6 @@ function run_script_main() {
     if [[ "${RUN_REMOTE}" == "true" && "${CLI_CONFIG_ENABLE_AUTO_DELETE_REMOTE_FILE}" == "true" ]]; then
         rm -rf "${FileDir}/${FileName}.${FileSuffix}"
     fi
+
+    return ${_run_exit_code}
 }

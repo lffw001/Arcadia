@@ -14,6 +14,17 @@ export type TasksType = TasksTypeEnum.SYSTEM | TasksTypeEnum.USER
 export type TasksFilterType = TasksType | TasksTypeEnum.ALL
 
 /**
+ * 高级配置
+ */
+export interface TaskConfigModel {
+  before_task_shell?: string
+  after_task_shell?: string
+  log_directory?: string
+  source_file?: string
+  allow_concurrency?: boolean
+}
+
+/**
  * 验证任务类型是否合法
  */
 export function isValidTasksType(value: string): value is TasksType {

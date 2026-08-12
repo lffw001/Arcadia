@@ -6,14 +6,20 @@ function command_notify() {
         print_command_help notify
         ;;
     1)
-        output_command_error 1 # 命令错误
+        output_command_error 1
         ;;
     2)
         import_config_not_check
-        send_notify "$1" "$2"
+        import message
+        push_message "$1" "$2"
+        ;;
+    3)
+        import_config_not_check
+        import message
+        push_message "$1" "$2" "$3"
         ;;
     *)
-        output_command_error 2 # 命令过多
+        output_command_error 2
         ;;
     esac
 }

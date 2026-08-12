@@ -1,0 +1,1 @@
+import{Ls as e,Rs as t,gs as n,rs as r}from"./index-4368cbe2.js";function i(r,i=Symbol(),a={}){let{readonly:o=!0,createProvider:s=!1,native:c=!1}=a,l=e(r),u=o?t(l):l;return s||n(i,c?r:u),{state:l}}function a(e=Symbol(),t){return r(e,t||{})}var o=Symbol(`appProviderContext`);function s(e){return i(e,o)}function c(){return a(o)}export{a as i,c as n,i as r,s as t};

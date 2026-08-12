@@ -22,7 +22,7 @@ export async function sendWebNotification(msg: messageModel, notification: alert
     })
 
     if (response.status === 200) {
-      logger.log(`Web notification sent successfully to ${target}: ${title}`)
+      logger.info(`Web notification sent successfully to ${target}: ${title}`)
     }
     else {
       logger.error(`Failed to send Web notification to ${target}: ${title}, status: ${response.status}`)

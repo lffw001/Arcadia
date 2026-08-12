@@ -16,7 +16,7 @@ export async function sendBarkNotification(msg: messageModel, notification: aler
 
     const response = await axios.get(fullUrl)
     if (response.status === 200) {
-      logger.log(`Bark notification sent successfully to ${target}: ${title}`)
+      logger.info(`Bark notification sent successfully to ${target}: ${title}`)
     }
     else {
       logger.error(`Failed to send Bark notification to ${target}: ${title}, status: ${response.status}`)

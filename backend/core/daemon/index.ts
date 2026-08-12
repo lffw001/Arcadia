@@ -3,8 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import pm2 from 'pm2'
 import { removeTask, setTask, validateCronExpression } from '../cron/engine'
-import { buildEnvCmdStr, buildOptionsArgs } from '../runner'
-import type { RunEnv, RunOption } from '../runner'
+import { buildEnvCmdStr, buildOptionsArgs } from '../executor'
+import type { RunEnv, RunOption } from '../executor'
 import { CLI_CMD } from '../type/cli'
 import { APP_DIR_PATH } from '../type'
 import db from '../../db'
@@ -112,7 +112,7 @@ export async function checkNameAvailable(name: string, excludeId?: number): Prom
   if (isSystemProcessName(name)) {
     return { available: false, reason: '该名称为系统保留进程名' }
   }
-  const dbRecord = await db.daemonTask.findFirst({ where: { name } })
+  const dbRecord = await db.daemonTask.$getById(name, 'name')
   if (dbRecord && dbRecord.id !== excludeId) {
     return { available: false, reason: '数据库中已存在同名任务' }
   }
@@ -196,7 +196,7 @@ export async function getAllProcessStatuses(names: string[]): Promise<Map<string
 }
 
 export async function startDaemonTask(id: number): Promise<void> {
-  const task = await db.daemonTask.findFirst({ where: { id } })
+  const task = await db.daemonTask.$getById(id)
   if (!task)
     throw new Error('任务不存在')
   if (task.active !== 1)
@@ -291,7 +291,7 @@ export async function startDaemonTask(id: number): Promise<void> {
 }
 
 export async function stopDaemonTask(id: number): Promise<void> {
-  const task = await db.daemonTask.findFirst({ where: { id } })
+  const task = await db.daemonTask.$getById(id)
   if (!task)
     throw new Error('任务不存在')
 
@@ -304,7 +304,7 @@ export async function stopDaemonTask(id: number): Promise<void> {
 }
 
 export async function restartDaemonTask(id: number): Promise<void> {
-  const task = await db.daemonTask.findFirst({ where: { id } })
+  const task = await db.daemonTask.$getById(id)
   if (!task)
     throw new Error('任务不存在')
 
@@ -314,7 +314,7 @@ export async function restartDaemonTask(id: number): Promise<void> {
 }
 
 export async function deleteDaemonTask(id: number): Promise<void> {
-  const task = await db.daemonTask.findFirst({ where: { id } })
+  const task = await db.daemonTask.$getById(id)
   if (!task)
     throw new Error('任务不存在')
 
@@ -327,14 +327,14 @@ export async function deleteDaemonTask(id: number): Promise<void> {
   }
 
   // 2. 删除 DB 记录
-  await db.daemonTask.delete({ where: { id } })
+  await db.daemonTask.$deleteById(id)
 
   // 3. 清理定时重启 cron
   removeTask(`D_${id}`)
 }
 
 export async function flushDaemonTaskLog(id: number): Promise<void> {
-  const task = await db.daemonTask.findFirst({ where: { id } })
+  const task = await db.daemonTask.$getById(id)
   if (!task)
     throw new Error('任务不存在')
 
@@ -353,7 +353,7 @@ export function trimLogFile(filePath: string, maxLines: number): void {
 }
 
 export async function trimDaemonTaskLog(id: number): Promise<void> {
-  const task = await db.daemonTask.findFirst({ where: { id } })
+  const task = await db.daemonTask.$getById(id)
   if (!task)
     throw new Error('任务不存在')
   if (!task.log_name)
@@ -365,7 +365,7 @@ export async function trimDaemonTaskLog(id: number): Promise<void> {
 }
 
 export async function getDaemonTaskLog(id: number, startLine?: number): Promise<{ content: string, totalLines: number, nextStartLine: number }> {
-  const task = await db.daemonTask.findFirst({ where: { id } })
+  const task = await db.daemonTask.$getById(id)
   if (!task)
     throw new Error('任务不存在')
   if (!task.log_name)
@@ -398,7 +398,7 @@ export async function getDaemonTaskLog(id: number, startLine?: number): Promise<
  */
 export async function initDaemonTask(): Promise<void> {
   // 自启任务
-  const bootTasks = await db.daemonTask.findMany({ where: { boot_start: 1, active: 1 } })
+  const bootTasks = await db.daemonTask.$list({ where: { boot_start: 1, active: 1 } })
   for (const task of bootTasks) {
     try {
       const list = await withPm2(() => pm2Describe(task.name))
@@ -414,7 +414,7 @@ export async function initDaemonTask(): Promise<void> {
   }
 
   // 注册定时重启
-  const cronTasks = await db.daemonTask.findMany({ where: { restart_cron: { not: '' }, active: 1 } })
+  const cronTasks = await db.daemonTask.$list({ where: { restart_cron: { not: '' }, active: 1 } })
   for (const task of cronTasks) {
     try {
       validateCronExpression(task.restart_cron)
@@ -428,7 +428,7 @@ export async function initDaemonTask(): Promise<void> {
     }
   }
 
-  logger.log('守护任务初始化完毕')
+  logger.info('守护任务初始化完成')
 }
 
 /**

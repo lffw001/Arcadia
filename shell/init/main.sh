@@ -30,6 +30,7 @@ function arcadia_init() {
     npm install --omit=dev
   fi
   cd $SrcDir
+  sync_prisma_schema
   pm2 start ecosystem.config.cjs
   if [[ -z $(grep -E "123456789" ${ConfigDir}/bot.json) ]]; then
     $ArcadiaCmd tgbot start

@@ -2,9 +2,10 @@ import type { Request } from 'express'
 import type { AxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import querystring from 'node:querystring'
+import { UAParser } from 'ua-parser-js'
 import { logger } from './logger'
 
-export { default as API_STATUS_CODE } from '../api/model'
+export { default as API_STATUS_CODE } from './statusCode'
 
 interface RequestConfig extends AxiosRequestConfig {
   body?: object | string
@@ -48,6 +49,23 @@ export const userAgentTools = {
 }
 
 /**
+ * 解析 User-Agent 字符串，提取浏览器、操作系统、设备信息
+ */
+export function parseUserAgent(ua: string): { browser: string, os: string, device: string } {
+  const result = UAParser(ua)
+  const browser = result.browser.name
+    ? `${result.browser.name}${result.browser.version ? ` ${result.browser.version.split('.')[0]}` : ''}`
+    : ''
+  const os = result.os.name
+    ? `${result.os.name}${result.os.version ? ` ${result.os.version}` : ''}`
+    : ''
+  const device = result.device.type
+    ? (result.device.type === 'mobile' ? 'Mobile' : result.device.type === 'tablet' ? 'Tablet' : result.device.type)
+    : 'Desktop'
+  return { browser, os, device }
+}
+
+/**
  * 获取用户 ip 地址
  */
 export function getClientIP(req: Request) {
@@ -59,6 +77,44 @@ export function getClientIP(req: Request) {
     ip = ip.split(',')[0]
   }
   return ip.substring(ip.lastIndexOf(':') + 1)
+}
+
+const IP_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 小时
+const IP_CACHE_MAX = 10000
+const ipCache = new Map<string, { address: string, expireAt: number }>()
+
+/**
+ * IP 转地址（带内存缓存）
+ *
+ * 使用 Map + TTL 惰性淘汰策略，24 小时内相同 IP 直接返回缓存结果
+ */
+export async function ip2AddressCached(ip: string) {
+  const cached = ipCache.get(ip)
+  if (cached && cached.expireAt > Date.now()) {
+    return { ip, address: cached.address }
+  }
+  if (cached)
+    ipCache.delete(ip)
+  const result = await ip2Address(ip)
+  // 惰性清理：超限时删除过期条目，再删除最旧的 20%
+  if (ipCache.size >= IP_CACHE_MAX) {
+    const now = Date.now()
+    for (const [key, val] of ipCache) {
+      if (val.expireAt <= now)
+        ipCache.delete(key)
+    }
+    if (ipCache.size >= IP_CACHE_MAX) {
+      const deleteCount = Math.floor(IP_CACHE_MAX * 0.2)
+      let i = 0
+      for (const key of ipCache.keys()) {
+        if (i++ >= deleteCount)
+          break
+        ipCache.delete(key)
+      }
+    }
+  }
+  ipCache.set(ip, { address: result.address, expireAt: Date.now() + IP_CACHE_TTL })
+  return result
 }
 
 /**
@@ -88,7 +144,7 @@ export async function ip2Address(ip: string) {
       },
     })
     if (data) {
-      let address = data.location === '* ' ? '未知' : data.location
+      let address = data.location === '* ' ? '' : data.location
       address = address.replace(/\t/g, ' ')
       return {
         ip,
@@ -101,7 +157,7 @@ export async function ip2Address(ip: string) {
   }
   return {
     ip,
-    address: '未知',
+    address: '',
   }
 }
 

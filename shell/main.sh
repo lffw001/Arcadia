@@ -76,6 +76,9 @@ function main() {
             import notify
             command_notify "$@"
             ;;
+        --version | -v)
+            print_version
+            ;;
         *)
             output_command_error 1 # 命令错误
             ;;

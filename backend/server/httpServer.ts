@@ -8,20 +8,22 @@ import bodyParser from 'body-parser'
 import { API_STATUS_CODE } from '../utils/httpUtil'
 import { APP_PUBLIC_DIR } from '../core/type'
 import { getJwtSecretSync } from '../core/config'
-import { OpenAPIAuthentication, OpenAPIExtra } from '../api/open'
-import { API as ApiFile, OpenAPI as OpenApiFile } from '../api/file'
-import { API as ApiEnv, OpenAPI as OpenApiEnv } from '../api/env'
-import { API as ApiCron, InnerAPI as InnerApiCron, OpenAPI as OpenApiCron } from '../api/cron'
-import { API as ApiMessage } from '../api/message'
-import { API as ApiCaptcha } from '../api/captcha'
-import { API as ApiExec, OpenAPI as OpenApiExec } from '../api/exec'
-import { API as ApiUser, InnerAPI as InnerApiUser } from '../api/user'
-import { API as ApiOpenApi, systemApi } from '../api/system'
-import { API as ApiAlert } from '../api/alert'
-import { API as ApiLog, InnerAPI as InnerApiLog } from '../api/log'
-import { API as ApiConfig } from '../api/config'
-import { API as ApiDaemon } from '../api/daemon'
-import { API as ApiDep } from '../api/dep'
+import { OpenAPIAuthentication, OpenAPIExtra, openApiLogMiddleware } from '../api/openapi/openApiGateway'
+import { API as ApiFile, OpenAPI as OpenApiFile } from '../api/routes/file'
+import { API as ApiEnv, OpenAPI as OpenApiEnv } from '../api/routes/env'
+import { API as ApiCron, InnerAPI as InnerApiCron, OpenAPI as OpenApiCron } from '../api/routes/cron'
+import { API as ApiMessage, InnerAPI as InnerApiMessage, OpenAPI as OpenApiMessage } from '../api/routes/message'
+import { API as ApiCaptcha } from '../api/routes/captcha'
+import { API as ApiExec, OpenAPI as OpenApiExec } from '../api/routes/exec'
+import { API as ApiUser, InnerAPI as InnerApiUser } from '../api/routes/user'
+import { API as ApiOpenApiToken } from '../api/openapi/openApiToken'
+import { systemApi } from '../api/routes/system'
+import { API as ApiAlert } from '../api/routes/alert'
+import { API as ApiLog } from '../api/routes/log'
+import { API as ApiConfig } from '../api/routes/config'
+import { API as ApiDaemon } from '../api/routes/daemon'
+import { API as ApiDep } from '../api/routes/dep'
+import { API as ApiUpdate, InnerAPI as InnerApiUpdate } from '../api/routes/update'
 
 function getToken(req: Request) {
   if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
@@ -72,7 +74,7 @@ export function registerApp(apiAuthentication: RequestHandler) {
 
   app.use(
     cors({
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+      origin: '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
@@ -118,9 +120,9 @@ export function registerApp(apiAuthentication: RequestHandler) {
   openApiRouter.use('/env', OpenApiEnv)
   openApiRouter.use('/cron', OpenApiCron)
   openApiRouter.use('/exec', OpenApiExec)
-  openApiRouter.use('/message', ApiMessage)
+  openApiRouter.use('/message', OpenApiMessage)
   openApiRouter.use('/alert', ApiAlert)
-  app.use('/api/open', OpenAPIAuthentication, openApiRouter)
+  app.use('/api/open', OpenAPIAuthentication, openApiLogMiddleware, openApiRouter)
   const handleOpenApiSyntaxError: ErrorRequestHandler = (err, _req, res, next) => {
     if (err && err?.name === 'SyntaxError') {
       const { message, code } = API_STATUS_CODE.OPEN_API.SYNTAX_ERROR
@@ -177,12 +179,13 @@ export function registerApp(apiAuthentication: RequestHandler) {
   apiRouter.use('/cron', ApiCron)
   apiRouter.use('/message', ApiMessage)
   apiRouter.use('/system', systemApi)
-  apiRouter.use('/token', ApiOpenApi)
+  apiRouter.use('/token', ApiOpenApiToken)
   apiRouter.use('/alert', ApiAlert)
   apiRouter.use('/log', ApiLog)
   apiRouter.use('/config', ApiConfig)
   apiRouter.use('/daemon', ApiDaemon)
   apiRouter.use('/dependency', ApiDep)
+  apiRouter.use('/update', ApiUpdate)
   app.use('/api', apiAuthentication, handleAuthenticationError, apiRouter)
 
   /**
@@ -202,7 +205,8 @@ export function registerApp(apiAuthentication: RequestHandler) {
   const innerRouter: Router = express.Router()
   innerRouter.use('/cron', InnerApiCron)
   innerRouter.use('/user', InnerApiUser)
-  innerRouter.use('/log', InnerApiLog)
+  innerRouter.use('/message', InnerApiMessage)
+  innerRouter.use('/update', InnerApiUpdate)
   app.use('/api/inner', innerIpWhitelist, innerRouter)
 
   /**

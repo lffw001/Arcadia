@@ -239,6 +239,34 @@ async function sendNotify(text, desp, params = {}, author = '\n\n' + end_txt) {
             wxPusherNotify(text, desp), //wxPusher
         ])
     }
+
+    // 消息中心推送
+    try {
+        const options = {
+            url: 'http://127.0.0.1:5678/api/inner/message/push',
+            body: JSON.stringify({
+                title: text,
+                content: desp,
+                type: 'info',
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            timeout: 5000,
+        }
+        $.post(options, (err, resp, data) => {
+            if (err) {
+                console.log(`Arcadia 推送通知失败：${err.message || err}`)
+            } else {
+                const result = JSON.parse(data)
+                if (result.code === 0 || resp.statusCode === 200) {
+                    console.log('已将消息推送至 Arcadia 平台')
+                } else {
+                    console.log(`Arcadia 推送通知失败：${data}`)
+                }
+            }
+        })
+    } catch {}
 }
 
 function serverNotify(text, desp, time = 2100) {
@@ -398,9 +426,9 @@ function ddBotNotify(text, desp) {
             timeout,
         }
         if (DD_BOT_TOKEN && DD_BOT_SECRET) {
-            const CryptoJS = require('crypto-js')
+            const crypto = require('crypto')
             const dateNow = Date.now()
-            const sign = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(`${dateNow}\n${DD_BOT_SECRET}`, DD_BOT_SECRET))
+            const sign = crypto.createHmac('sha256', DD_BOT_SECRET).update(`${dateNow}\n${DD_BOT_SECRET}`).digest('base64')
             options.url = `${options.url}&timestamp=${dateNow}&sign=${encodeURIComponent(sign)}`
             $.post(options, (err, resp, data) => {
                 try {

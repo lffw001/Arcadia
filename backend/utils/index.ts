@@ -1,3 +1,4 @@
+/* eslint-disable ts/no-empty-object-type */
 import type { Request } from 'express'
 
 /**
@@ -183,18 +184,18 @@ type InferParam<TParam extends readonly [string, ValidateParamsOptions?]>
   = TParam extends readonly [infer Name extends string, infer Options extends ValidateParamsOptions]
     ? Options extends readonly [infer R, ...any]
       ? R extends true
-        ? { readonly [K in Name]: InferParamType<Options> }
-        : { readonly [K in Name]?: InferParamType<Options> }
-      : { readonly [K in Name]?: string }
+        ? { [K in Name]: InferParamType<Options> }
+        : { [K in Name]?: InferParamType<Options> }
+      : { [K in Name]?: string }
     : TParam extends readonly [infer Name extends string]
-      ? { readonly [K in Name]?: string }
-      : Record<string, never>
+      ? { [K in Name]?: string }
+      : {}
 
 // 合并参数对象类型
 type MergeParams<T extends ReadonlyArray<readonly [string, ValidateParamsOptions?]>>
   = T extends readonly [infer First extends readonly [string, ValidateParamsOptions?], ...infer Rest extends ReadonlyArray<readonly [string, ValidateParamsOptions?]>]
     ? InferParam<First> & MergeParams<Rest>
-    : Record<string, never>
+    : {}
 
 // 参数配置类型
 interface ParamsConfig<
@@ -220,6 +221,9 @@ export interface ValidatedParams<
 
 /**
  * 传参校验（拦截器）
+ *
+ * @description 可返回数据，规则需设定 `as const`
+ * @description clean=true 时仅返回声明参数（等价 cleanProperties）
  */
 export function validateRequestParams<
   TQuery extends ReadonlyArray<readonly [string, ValidateParamsOptions?]> | undefined = undefined,
@@ -227,7 +231,14 @@ export function validateRequestParams<
 >(
   req: Request,
   config: ParamsConfig<TQuery, TBody>,
+  clean: boolean = false,
 ): ValidatedParams<TQuery, TBody> {
+  const result: {
+    query: Record<string, unknown>
+    body: Record<string, unknown>
+  } = clean
+    ? { query: {}, body: {} }
+    : { query: { ...(req.query ?? {}) }, body: { ...(req.body ?? {}) } }
   Object.entries(config).forEach(([paramType, paramList]) => {
     if (paramType !== 'query' && paramType !== 'body') {
       return
@@ -235,27 +246,26 @@ export function validateRequestParams<
     if (!paramList) {
       return
     }
+    const source = (req[paramType] ?? {}) as Record<string, unknown>
+    const picked = result[paramType]
     paramList.forEach(([paramName, options = []]) => {
       const [required = false, type = 'string', allowEmptyString = false] = options
-      const params = req[paramType] ?? {}
 
-      if (!Object.prototype.hasOwnProperty.call(params, paramName)) {
+      if (!Object.prototype.hasOwnProperty.call(source, paramName)) {
         if (required) {
           throw new Error(`缺少必要的参数 ${paramName}`)
         }
         return // 如果该参数不是必需的且不存在，则跳过其余检查
       }
-      const paramValue = params[paramName]
+      const paramValue = source[paramName]
       if (required) {
         if (paramType === 'query') {
-          const value = params[paramName]
-          if ((['undefined', 'None', null].includes(value) || (!allowEmptyString && value === ''))) {
+          if ((['undefined', 'None', null].includes(paramValue as string | null) || (!allowEmptyString && paramValue === ''))) {
             throw new Error(`参数 ${paramName} 无效（参数值不能为空）`)
           }
         }
         else if (paramType === 'body') {
-          const value = params[paramName]
-          if ((['undefined', 'None', null].includes(value) || Number.isNaN(value)) || (Array.isArray(value) && value.length === 0) || (!allowEmptyString && typeof value === 'string' && value === '')) {
+          if ((['undefined', 'None', null].includes(paramValue as string | null) || Number.isNaN(paramValue)) || (Array.isArray(paramValue) && paramValue.length === 0) || (!allowEmptyString && typeof paramValue === 'string' && paramValue === '')) {
             throw new Error(`参数 ${paramName} 无效（参数值不能为空）`)
           }
         }
@@ -274,13 +284,14 @@ export function validateRequestParams<
       else if (!checkType(paramValue, type)) {
         throw new Error(`参数 ${paramName} 无效（参数值类型错误）`)
       }
+      // clean=true 时仅收集声明参数
+      if (clean) {
+        picked[paramName] = paramValue
+      }
     })
   })
 
-  return {
-    query: req.query,
-    body: req.body,
-  } as ValidatedParams<TQuery, TBody>
+  return result as ValidatedParams<TQuery, TBody>
 }
 
 /**
@@ -312,7 +323,14 @@ export function validatePageFixedParams(req: Request, orderByFields?: (string | 
  */
 export type ValidateObjectParamType = [paramName: string, options?: [required: boolean, type: string | Array<string | number>]]
 
-export function validateObject(obj: object, params: ValidateObjectParamType[], objName: string = '') {
+/**
+ * 对象格式校验（拦截器），仅校验不修改源对象
+ */
+export function validateObject<T extends object>(
+  obj: T,
+  params: ReadonlyArray<ValidateObjectParamType>,
+  objName: string = '',
+): void {
   if (objName) {
     objName = ` ${objName} `
   }
@@ -349,20 +367,23 @@ export function validateObject(obj: object, params: ValidateObjectParamType[], o
 }
 
 /**
- * 去除对象中的非指定属性
+ * 去除对象中的非指定属性，配合 `as const` 推导返回类型
  */
-export function cleanProperties<T extends object>(obj: T, fields: string[]): T {
+export function cleanProperties<T extends object, const F extends readonly string[]>(
+  obj: T,
+  fields: F,
+): F extends readonly (keyof T)[] ? Pick<T, F[number]> : T {
   if (!obj)
-    return obj
+    return obj as F extends readonly (keyof T)[] ? Pick<T, F[number]> : T
   const originalObject = obj
   return Object.keys(obj)
     .filter((key) => {
       return fields.includes(key)
     })
     .reduce((acc, key) => {
-      acc[key] = originalObject[key]
+      acc[key] = originalObject[key as keyof T]
       return acc
-    }, {} as T)
+    }, {} as T) as F extends readonly (keyof T)[] ? Pick<T, F[number]> : T
 }
 
 export function randomString(length?: number, options?: {

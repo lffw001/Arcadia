@@ -1,6 +1,9 @@
 import type { Server, Socket } from 'socket.io'
 import { APP_ROOT_DIR } from '../core/type'
+import { socketAuthMiddleware } from './socket'
 // import { logger } from '../utils/logger'
+
+const MAX_PTY_SESSIONS = 20
 
 interface IPty {
   pid: number
@@ -38,13 +41,18 @@ function createPtyProcess(options: {
     throw new Error('node-pty module not loaded')
   }
 
-  const cols = Math.min(Math.max(options.cols || 80, 1), 500)
-  const rows = Math.min(Math.max(options.rows || 24, 1), 200)
-  const cwd = options.cwd || APP_ROOT_DIR
+  const cols = typeof options.cols === 'number' && Number.isFinite(options.cols)
+    ? Math.min(Math.max(Math.floor(options.cols), 1), 500)
+    : 80
+  const rows = typeof options.rows === 'number' && Number.isFinite(options.rows)
+    ? Math.min(Math.max(Math.floor(options.rows), 1), 200)
+    : 24
+  const cwd = typeof options.cwd === 'string' && options.cwd ? options.cwd : APP_ROOT_DIR
+  const command = typeof options.command === 'string' ? options.command : undefined
   const shell = getShell()
 
   // 如果指定了 command，通过 shell -c 执行
-  const args = options.command ? ['-c', options.command] : []
+  const args = command ? ['-c', command] : []
 
   return ptyModule.spawn(shell, args, {
     name: 'xterm-256color',
@@ -61,12 +69,14 @@ function createPtyProcess(options: {
 
 /**
  * 初始化终端服务
- * 基于 Socket.IO 的 /terminal 命名空间，复用主 io 实例的认证中间件
+ * 基于 Socket.IO 的 /terminal 命名空间，复用主 IO 的认证与连接上限中间件
  */
 export async function initTerminalServer(io: Server) {
   await loadNodePty()
 
   const terminalNs = io.of('/terminal')
+
+  terminalNs.use(socketAuthMiddleware)
 
   terminalNs.on('connection', (socket: Socket) => {
     // logger.info(`Terminal socket connected: ${socket.id}`)
@@ -77,9 +87,18 @@ export async function initTerminalServer(io: Server) {
       cwd?: string
       command?: string
     } = {}) => {
+      if (!options || typeof options !== 'object') {
+        socket.emit('terminal:error', 'Invalid terminal options')
+        return
+      }
+
       // 每个 socket 只允许一个 PTY 会话
       if (sessions.has(socket.id)) {
         socket.emit('terminal:error', 'Session already exists')
+        return
+      }
+      if (sessions.size >= MAX_PTY_SESSIONS) {
+        socket.emit('terminal:error', 'Terminal session limit reached')
         return
       }
 
@@ -87,7 +106,7 @@ export async function initTerminalServer(io: Server) {
       try {
         ptyProcess = createPtyProcess(options)
       }
-      catch (err) {
+      catch {
         // logger.error('Failed to create PTY process:', err)
         socket.emit('terminal:error', 'Failed to create terminal')
         return
@@ -114,18 +133,24 @@ export async function initTerminalServer(io: Server) {
     // 客户端 → PTY
     socket.on('terminal:input', (data: string) => {
       const pty = sessions.get(socket.id)
-      if (pty) {
-        pty.write(data)
+      if (pty && typeof data === 'string') {
+        try {
+          pty.write(data)
+        }
+        catch {}
       }
     })
 
     // 终端尺寸调整
     socket.on('terminal:resize', (size: { cols: number, rows: number }) => {
       const pty = sessions.get(socket.id)
-      if (pty && typeof size.cols === 'number' && typeof size.rows === 'number') {
-        const cols = Math.min(Math.max(size.cols, 1), 500)
-        const rows = Math.min(Math.max(size.rows, 1), 200)
-        pty.resize(cols, rows)
+      if (pty && size && typeof size === 'object' && typeof size.cols === 'number' && typeof size.rows === 'number' && Number.isFinite(size.cols) && Number.isFinite(size.rows)) {
+        try {
+          const cols = Math.min(Math.max(size.cols, 1), 500)
+          const rows = Math.min(Math.max(size.rows, 1), 200)
+          pty.resize(cols, rows)
+        }
+        catch {}
       }
     })
 

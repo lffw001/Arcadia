@@ -4,16 +4,16 @@ export const APP_ROOT_DIR = path.resolve(import.meta.dirname, '../../../../') //
 export const APP_SOURCE_DIR = path.join(import.meta.dirname, '../../../') // 源码目录 /arcadia/src
 export const APP_PUBLIC_DIR = path.join(APP_SOURCE_DIR, 'public') // 静态文件目录 /arcadia/src/public
 
-export enum APP_FILE_TYPE {
-  CONFIG = 'config',
-}
-
 export enum APP_FILE_NAME {
   DB = 'config.db',
   CONFIG = 'config.sh',
   ENV = 'env.sh',
   CLI_CONFIG = '.arcadia_cli_config.sh',
   EXTRA_SERVER = 'extra_server.js',
+  SYNC = 'sync.yml',
+  BOT = 'bot.json',
+  UPDATE_MARKER = 'update-marker.json',
+  UPDATE_RUN_LOG = 'update-run.log',
 }
 
 export enum APP_DIR_TYPE {
@@ -25,6 +25,7 @@ export enum APP_DIR_TYPE {
   SCRIPTS = 'scripts',
   SHELL = 'shell',
   LOG = 'log',
+  TMP = '.tmp',
   REPO = 'repo',
   RAW = 'raw',
   CONFIG_BAK = 'bak',
@@ -38,6 +39,7 @@ export const APP_DIR_PATH = {
   SCRIPTS: path.join(APP_ROOT_DIR, APP_DIR_TYPE.SCRIPTS), // 代码文件目录（用户）
   SHELL: path.join(APP_SOURCE_DIR, APP_DIR_TYPE.SHELL), // 底层脚本目录
   LOG: path.join(APP_ROOT_DIR, APP_DIR_TYPE.LOG), // 日志目录（用户）
+  TMP: path.join(APP_ROOT_DIR, APP_DIR_TYPE.LOG, APP_DIR_TYPE.TMP), // 临时数据目录（用户）
   REPO: path.join(APP_ROOT_DIR, APP_DIR_TYPE.REPO), // 代码仓库目录（用户）
   RAW: path.join(APP_ROOT_DIR, APP_DIR_TYPE.RAW), // 远程代码文件目录（用户）
   CONFIG_BAK: path.join(APP_ROOT_DIR, APP_DIR_TYPE.CONFIG, APP_DIR_TYPE.CONFIG_BAK), // 配置文件备份目录
@@ -50,6 +52,9 @@ export const APP_FILE_PATH = {
   CLI_CONFIG: path.join(APP_DIR_PATH.CONFIG, APP_FILE_NAME.CLI_CONFIG), // .arcadia_cli_config.sh 文件路径
   EXTRA_SERVER: path.join(APP_DIR_PATH.CONFIG, APP_FILE_NAME.EXTRA_SERVER), // extra_server.js 文件路径
   RESOLVE_SCRIPT: path.join(APP_DIR_PATH.SHELL, 'utils/resolve.sh'), // resolve.sh 文件路径
+  UPDATE_SH: path.join(APP_DIR_PATH.SHELL, 'utils/update.sh'), // 更新脚本文件路径
+  UPDATE_MARKER: path.join(APP_DIR_PATH.TMP, APP_FILE_NAME.UPDATE_MARKER), // 更新进度标记文件路径
+  UPDATE_RUN_LOG: path.join(APP_DIR_PATH.TMP, APP_FILE_NAME.UPDATE_RUN_LOG), // 更新脚本运行日志临时文件路径
 }
 
 export enum APP_FILE_TYPES {
@@ -58,4 +63,4 @@ export enum APP_FILE_TYPES {
 }
 
 // 系统默认时区
-export const APP_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
+export const APP_TIMEZONE = new Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
