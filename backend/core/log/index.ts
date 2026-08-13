@@ -67,6 +67,28 @@ export async function cleanOpenApiLogs(days: number) {
 }
 
 /**
+ * 清空操作日志
+ */
+export async function clearServerLogs() {
+  return await db.serverLog.deleteMany({ where: {} })
+}
+
+/**
+ * 清空登录日志
+ */
+export async function clearLoginLogs() {
+  return await db.loginLog.deleteMany({ where: {} })
+}
+
+/**
+ * 清空开放接口日志
+ */
+export async function clearOpenApiLogs() {
+  await flushOpenApiLogBuffer()
+  return await db.openApiLog.deleteMany({ where: {} })
+}
+
+/**
  * 开放接口日志条目
  */
 export interface OpenApiLogEntry {
