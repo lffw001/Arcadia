@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto'
 import { db } from '../../db'
 import { validateObject } from '../../utils'
 import type { MessageData } from '../type/message'
-// import { processMessageAlert } from '../alert'
 import { socketCommon } from '../../server/socketCommon'
 
 // 消息去重缓存（FIFO 淘汰）
@@ -79,9 +78,6 @@ export async function sendMessage(data: MessageData): Promise<boolean> {
 
   // 注册去重缓存
   registerDedup(fingerprint)
-
-  // 监控告警
-  // await processMessageAlert(msg)
 
   // 通过 WebSocket 推送新消息
   socketCommon.emit('message:new', {
