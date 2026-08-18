@@ -160,6 +160,11 @@ function define_base_command() {
 
     # 后台挂起（守护进程）
     if [[ "${RUN_OPTION_DAEMON}" == "true" ]]; then
+        # 禁止运行源码目录中的文件
+        if [[ "${FileDir}" == "${SrcDir}" || "${FileDir}" == "${SrcDir}/"* ]]; then
+            output_error "守护进程模式不可运行源码目录中的文件！"
+        fi
+
         local interpreter
         local _daemon_name="${RUN_OPTION_DAEMON_NAME:-$FileName}"
         local _daemon_max_restarts="${RUN_OPTION_DAEMON_MAX_RESTARTS:-99999}"

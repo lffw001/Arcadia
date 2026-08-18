@@ -5,6 +5,7 @@ import type { loginLogWhereInput, openApiLogWhereInput, serverLogWhereInput } fr
 import db from '../../db'
 import { validateRequestParams } from '../../utils'
 import { CLEANUP_TYPES, runCleanup } from '../../core/cleanup'
+import { clearLoginLogs, clearOpenApiLogs, clearServerLogs } from '../../core/log'
 
 const api: Express = express()
 
@@ -127,6 +128,30 @@ api.post('/cleanup', async (request, response) => {
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || '清理失败'))
+  }
+})
+
+/**
+ * 清空指定类型的系统日志
+ */
+api.delete('/clear', async (request, response) => {
+  try {
+    const params = validateRequestParams(request, {
+      body: [
+        ['type', [true, ['server', 'login', 'openapi']]],
+      ] as const,
+    })
+    const { type } = params.body
+    const clearFunctions = {
+      server: clearServerLogs,
+      login: clearLoginLogs,
+      openapi: clearOpenApiLogs,
+    } as const
+    const result = await clearFunctions[type]()
+    response.send(API_STATUS_CODE.okData({ count: result.count }))
+  }
+  catch (e: any) {
+    response.send(API_STATUS_CODE.fail(e.message || '清空日志失败'))
   }
 })
 

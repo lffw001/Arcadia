@@ -56,28 +56,41 @@ api.post('/', async (request, response) => {
   try {
     const params = validateRequestParams(request, {
       body: [
-        ['name', [true, 'string']],
+        ['name', [true, 'string | string[]']],
         ['ecosystem', [true, ECOSYSTEMS]],
         ['remark', [false, 'string']],
       ] as const,
     })
-    const { name, ecosystem, remark } = params.body as { name: string, ecosystem: string, remark?: string }
-    const cleanName = name.trim()
-    if (!cleanName)
-      throw new Error('名称不能为空')
-    const baseName = getBaseName(ecosystem, cleanName)
-    if (PROTECTED[ecosystem]?.has(baseName))
-      throw new Error(`${baseName} 为平台保留依赖，禁止添加！`)
-    const exists = await db.dependencyManage.findFirst({ where: { name: cleanName, ecosystem } })
-    if (exists)
-      throw new Error(`${cleanName} 依赖已存在`)
-    const item = await db.dependencyManage.$create({
-      name: cleanName,
-      ecosystem,
-      remark: remark?.trim() ?? '',
-      status: DepStatus.NOT_INSTALLED,
-    })
-    response.send(API_STATUS_CODE.okData(item))
+    const { name, ecosystem, remark } = params.body as { name: string | string[], ecosystem: string, remark?: string }
+    const names = Array.isArray(name) ? name : [name]
+    const cleanRemark = remark?.trim() ?? ''
+
+    const formatData: Array<{ name: string, ecosystem: string, remark: string, status: number }> = []
+    const seen = new Set<string>()
+    for (const rawName of names) {
+      const cleanName = rawName.trim()
+      if (!cleanName)
+        throw new Error('名称不能为空')
+      const key = `${ecosystem}:${cleanName}`
+      if (seen.has(key))
+        continue
+      seen.add(key)
+      const baseName = getBaseName(ecosystem, cleanName)
+      if (PROTECTED[ecosystem]?.has(baseName))
+        throw new Error(`${baseName} 为平台保留依赖，禁止添加！`)
+      const exists = await db.dependencyManage.findFirst({ where: { name: cleanName, ecosystem } })
+      if (exists)
+        throw new Error(`${cleanName} 依赖已存在`)
+      formatData.push({
+        name: cleanName,
+        ecosystem,
+        remark: cleanRemark,
+        status: DepStatus.NOT_INSTALLED,
+      })
+    }
+
+    const result = await db.dependencyManage.$create(formatData)
+    response.send(API_STATUS_CODE.okData(result))
   }
   catch (e: any) {
     response.send(API_STATUS_CODE.fail(e.message || e))

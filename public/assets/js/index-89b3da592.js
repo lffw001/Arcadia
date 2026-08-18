@@ -1,1 +1,0 @@
-import{ts as e}from"./index-4368cbe2.js";import{gt as t}from"./index-5393c8ea.js";function n(n,r={}){if(typeof n==`string`){let t=`i-${n.replace(`:`,`-`)}`;return()=>e(`i`,{class:[t,r.class],style:r.style,onClick:r.onClick})}return i=>{let a={...r,...i};return e(t,a,{default:()=>e(n)})}}export{n as t};

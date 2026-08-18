@@ -14,6 +14,7 @@ export interface taskRunInfo {
   endTime: number
   duration: number
   success: boolean
+  manual: boolean
   task: Pick<tasksModel, 'id' | 'name' | 'type' | 'error_notify'>
 }
 
@@ -147,7 +148,7 @@ export async function runCronTask(taskId: number, manual: boolean = false) {
 
     const runId = randomString(16)
     const startTime = Date.now()
-    const child = runTaskModel(task, runId, config.allow_concurrency)
+    const child = runTaskModel(task, runId, config.allow_concurrency, manual)
 
     // 注册到多实例运行表（仅当子进程成功创建时）
     if (child) {
@@ -226,10 +227,11 @@ function runTaskModel(
   task: tasksModel,
   runId: string,
   allowConcurrency: boolean,
+  manual: boolean,
 ) {
   const startTime = Date.now()
 
-  emitTaskStarted(task)
+  emitTaskStarted(task, manual)
 
   return execShell(task.shell, {
     callback: (error, stdout, _stderr) => {
@@ -241,7 +243,7 @@ function runTaskModel(
       const endTime = new Date().getTime()
       const duration = endTime - startTime
       const success = code === 0 || code === null
-      const info: taskRunInfo = { task, startTime, endTime, duration, success }
+      const info: taskRunInfo = { task, startTime, endTime, duration, success, manual }
 
       try {
         cleanupRunningTaskState(task, runId, startTime, duration, allowConcurrency)

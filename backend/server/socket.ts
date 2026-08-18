@@ -61,11 +61,12 @@ export function initSocketServer(server: HttpServer) {
   return io
 }
 
-export function emitTaskStarted(task: Pick<tasksModel, 'id' | 'name' | 'type'>) {
+export function emitTaskStarted(task: Pick<tasksModel, 'id' | 'name' | 'type'>, manual: boolean) {
   socketCommon.emit('task:started', {
     taskId: task.id,
     taskName: task.name,
     taskType: task.type,
+    manual,
     startTime: Date.now(),
   })
 }
@@ -75,6 +76,7 @@ export function emitTaskCompleted(info: taskRunInfo) {
     taskId: info.task.id,
     taskName: info.task.name,
     taskType: info.task.type,
+    manual: info.manual,
     completedTime: Date.now(),
     duration: info.duration,
     success: info.success,

@@ -1,0 +1,1 @@
+import{Bs as e}from"./index-737aeaf0.js";import{i as t,r as n}from"./index-8e95a789.js";var r=n(`run-cmd-modal`,()=>({runCmd:e()}));function i(){let e=r(),{runCmd:n}=t(e);return{runCmd:n}}export{i as t};
