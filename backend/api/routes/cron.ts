@@ -687,7 +687,9 @@ apiInner.post('/updateAll', async (request, response) => {
         },
       })
       const deleteIds = deleteTask.map((s) => s.id)
-      await db.tasks.$deleteById(deleteIds)
+      if (deleteIds.length > 0) {
+        await db.tasks.$deleteById(deleteIds)
+      }
       for (const item of deleteTask) {
         const paths = item.bind.split('#')
         const path = `${paths[1]}/${paths[2]}`
@@ -726,7 +728,9 @@ apiInner.post('/updateAll', async (request, response) => {
         },
       })
       const deleteIds = deleteTask.map((s) => s.id)
-      await db.tasks.$deleteById(deleteIds)
+      if (deleteIds.length > 0) {
+        await db.tasks.$deleteById(deleteIds)
+      }
       await applyCron(deleteIds)
       // 插入定时任务
       for (const item of newFiles) {
