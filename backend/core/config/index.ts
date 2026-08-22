@@ -357,7 +357,9 @@ async function _migrateSystemConfigKeys(): Promise<void> {
   if (entries.length > 0) {
     await updateSystemConfigValues(entries)
   }
-  await db.config.$deleteById(idsToDelete)
+  if (idsToDelete.length > 0) {
+    await db.config.$deleteById(idsToDelete)
+  }
 }
 
 /**
